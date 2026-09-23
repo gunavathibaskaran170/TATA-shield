@@ -1,0 +1,17 @@
+{
+  "name": "shield-hardware-twin",
+  "version": "0.9.2",
+  "private": true,
+  "description": "SHIELD — Structural & Hardware Digital Twin workspace for EV-CH-007 instrumented prototype",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "main": "server.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "puppeteer-core": "^22.15.0"
+  }
+}
