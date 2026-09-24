@@ -171,6 +171,24 @@ export function createTwinPage(host, nav) {
 
   page.innerHTML = `
     <div class="tw-stage" id="tw-stage"></div>
+    <div class="tw-camera-dock" id="tw-camera-dock">
+      <div class="cam-dock-header">CAMERA</div>
+      <div class="cam-dock-btns">
+        <button class="btn cam-btn" id="tw-cam-iso" title="ISO">ISO</button>
+        <button class="btn cam-btn" id="tw-cam-front" title="Front">FRONT</button>
+        <button class="btn cam-btn" id="tw-cam-top" title="Top">TOP</button>
+        <button class="btn cam-btn" id="tw-cam-side" title="Side">SIDE</button>
+        <button class="btn cam-btn" id="tw-cam-rear" title="Rear">REAR</button>
+        <button class="btn cam-btn" id="tw-cam-bottom" title="Bottom">BOTTOM</button>
+      </div>
+      <div class="cam-dock-divider"></div>
+      <div class="cam-dock-zoom">
+        <button class="btn zoom-btn" id="tw-zoom-in" title="Zoom In" aria-label="Zoom In">➕</button>
+        <button class="btn zoom-btn" id="tw-zoom-out" title="Zoom Out" aria-label="Zoom Out">➖</button>
+      </div>
+      <div class="cam-dock-divider"></div>
+      <button class="btn reset-btn" id="tw-reset-cam" title="Reset View">↺ Reset</button>
+    </div>
     <div class="tw-tabs" id="tw-tabs"></div>
     <div class="tw-badges">
       <div class="badge" id="tw-scen"></div>
@@ -189,9 +207,6 @@ export function createTwinPage(host, nav) {
       <div class="brow scen-row">
         <span class="scen-label">SCENARIO</span>
         <div id="tw-scenarios" style="display:flex;gap:6px;overflow:hidden"></div>
-        <button class="btn small" id="tw-zoom-in" title="Zoom In">➕</button>
-        <button class="btn small" id="tw-zoom-out" title="Zoom Out">➖</button>
-        <button class="btn small" id="tw-reset" style="margin-left:auto">Reset View</button>
         <button class="btn small" id="tw-to-hw">Hardware Twin →</button>
       </div>
       <div class="brow"><div class="kpi-strip" id="tw-kpis"></div></div>
@@ -893,8 +908,25 @@ export function createTwinPage(host, nav) {
     V.controls.dollyOut(1.3);
     V.controls.update();
   });
-  page.querySelector('#tw-reset').addEventListener('click', () => {
+  page.querySelector('#tw-reset-cam').addEventListener('click', () => {
     V.flyTo(V.defaults.homePos.clone(), V.defaults.homeTarget.clone(), 0.7);
+  });
+  // Camera dock view presets
+  const camPresets = {
+    iso:     () => new THREE.Vector3(0.62, 0.55, 0.62).normalize().multiplyScalar(0.8),
+    front:   () => new THREE.Vector3(0, 0.14, 1).normalize().multiplyScalar(0.8),
+    top:     () => new THREE.Vector3(0, 1, 0.14).normalize().multiplyScalar(0.8),
+    side:    () => new THREE.Vector3(1, 0.18, 0).normalize().multiplyScalar(0.8),
+    bottom:  () => new THREE.Vector3(0, -1, 0.25).normalize().multiplyScalar(0.8),
+    rear:    () => new THREE.Vector3(0, 0.14, -1).normalize().multiplyScalar(0.8),
+  };
+  Object.entries(camPresets).forEach(([key, fn]) => {
+    const btn = page.querySelector('#tw-cam-' + key);
+    if (btn) btn.addEventListener('click', () => {
+      const target = V.defaults.homeTarget.clone();
+      const pos = fn();
+      V.flyTo(pos.add(target), target, 0.7);
+    });
   });
   page.querySelector('#tw-to-hw').addEventListener('click', () => {
     if (nav) nav('hardware', state.sel && state.sel.kind === 'region' ? state.sel.id : null);

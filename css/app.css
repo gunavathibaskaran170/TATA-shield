@@ -190,6 +190,50 @@ body::before {
     linear-gradient(180deg, rgba(4,6,11,0.28), transparent 12%, transparent 88%, rgba(4,6,11,0.5));
 }
 
+/* ---- Camera Dock (right side, fixed) ---- */
+.tw-camera-dock {
+  position: absolute; top: 12px; right: 12px; z-index: 14;
+  width: 160px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  padding: 10px 12px;
+  display: flex; flex-direction: column; gap: 8px;
+  font-family: var(--font);
+}
+.cam-dock-header {
+  font-size: 9px; letter-spacing: 2px; color: var(--text-faint);
+  text-align: center; padding-bottom: 4px; border-bottom: 1px solid var(--line);
+}
+.cam-dock-btns {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;
+}
+.cam-btn {
+  padding: 5px 4px; border-radius: 6px; font-size: 9px; letter-spacing: 0.5px;
+  background: transparent; border: 1px solid var(--line); color: var(--text-dim);
+  cursor: pointer; transition: all 0.12s;
+}
+.cam-btn:hover { background: rgba(56,217,207,0.1); border-color: var(--accent); color: var(--accent); }
+.cam-btn.active { background: rgba(56,217,207,0.18); border-color: var(--accent); color: var(--accent); }
+.cam-dock-divider { height: 1px; background: var(--line); margin: 4px 0; }
+.cam-dock-zoom {
+  display: flex; gap: 6px; justify-content: center;
+}
+.zoom-btn {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--panel-2); border: 1px solid var(--line); color: var(--text);
+  font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all 0.12s;
+}
+.zoom-btn:hover { background: var(--accent); border-color: var(--accent); color: #04131c; transform: scale(1.05); }
+.zoom-btn:active { transform: scale(0.98); }
+.reset-btn {
+  width: 100%; padding: 8px; border-radius: 7px;
+  background: var(--panel-2); border: 1px solid var(--line); color: var(--text-dim);
+  font-size: 10px; letter-spacing: 0.5px; cursor: pointer; transition: all 0.12s;
+}
+.reset-btn:hover { background: var(--danger); border-color: var(--danger); color: #fff; }
+
 /* ---- View tabs (over canvas, top centre-left) ---- */
 .tw-tabs {
   position: absolute; top: 12px; left: 14px; z-index: 12;
