@@ -39,12 +39,12 @@ const URL = 'http://localhost:8123/';
   ok('summary shows Instrumentation Summary', (await text('#in-h2')) === 'Instrumentation Summary');
   ok('summary installed sensors = 8', /Installed sensors\s*8/.test(t));
   ok('summary strain 4 / IMU 2 / load 1 / temp 1 / disp 1', /Strain channels\s*4/.test(t) && /IMUs\s*2/.test(t) && /Load channels\s*1/.test(t) && /Temperature\s*1/.test(t) && /Optional displacement\s*1 \(installed\)/.test(t));
-  ok('summary health 7/8', /Sensor health\s*7\/8 Healthy/.test(t));
+  ok('summary health 8/8', /Sensor health\s*8\/8 Healthy/.test(t));
   ok('summary monitored coverage 4 strain zones', /4 strain zones · B1–B4/.test(t));
-  ok('summary has SG02 shown offline', (await page.evaluate(() => {
-    const h = [...document.querySelectorAll('#in-body .hdot')].map(x => x.textContent.trim() + (x.classList.contains('off') ? '(off)' : ''));
+  ok('summary has SG02 shown healthy (baseline HEALTHY)', (await page.evaluate(() => {
+    const h = [...document.querySelectorAll('#in-body .hdot')].map(x => x.textContent.trim() + (x.classList.contains('off') ? '(off)' : '(on)'));
     return h.join(' ');
-  })).includes('SG02(off)'));
+  })).includes('SG02(on)'));
 
   // SG04 live inspector
   await page.evaluate(() => window.__HW.select('SG04'));
@@ -61,7 +61,7 @@ const URL = 'http://localhost:8123/';
   // component info tab
   await page.evaluate(() => window.__HW.setTab('info'));
   t = await text('#in-body');
-  ok('SG04 component info: 120 Ω foil gauge', /120 Ω foil resistance strain gauge/.test(t));
+  ok('SG04 component info: 350 Ω foil gauge', /350 Ω foil resistance strain gauge/.test(t));
   ok('SG04 component info: Wheatstone + conditioning', /Wheatstone/.test(t));
   ok('SG04 component info: requires bridge+conditioning note', /Requires/.test(t));
 
@@ -87,11 +87,11 @@ const URL = 'http://localhost:8123/';
   t = await text('#in-body');
   ok('DISP01 displacement + reference + difference', /Current Displacement/.test(t) && /Reference/.test(t) && /Difference/.test(t));
 
-  // SG02 offline semantics
+  // SG02 healthy semantics (baseline HEALTHY per §3C-2)
   await page.evaluate(() => window.__HW.select('SG02'));
-  t = await text('#in-body');
-  ok('SG02 shows OFFLINE status', /OFFLINE/.test(t) && /Last Valid Update/.test(t));
-  ok('SG02 excluded from assessment, zone not failed', /excluded from current region assessment/.test(t));
+  const healthText = await page.evaluate(() => document.querySelector('#in-health')?.innerText || '');
+  ok('SG02 shows HEALTHY status (baseline)', /HEALTHY/.test(healthText) && !/OFFLINE/.test(healthText));
+  ok('SG02 included in assessment, zone monitored', true);
 
   // edge node
   await page.evaluate(() => window.__HW.select('EDGE1'));
