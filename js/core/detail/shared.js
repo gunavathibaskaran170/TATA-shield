@@ -161,19 +161,22 @@ export function buildStrainFoil(subW, subL, gridW, gridL) {
   );
   const grid = new THREE.Group();
   grid.position.y = 0.00045;
-  // serpentine: vertical traces connected alternately at the ends
-  const traceW = 0.00055, traceGap = gridW / 12;
+  // serpentine: fixed 8 vertical trace columns connected alternately at the ends
+  // (grid density is a family constant — trace spacing scales with grid size)
+  const traceW = 0.00055;
   const foilMatX = metal(0xd9a441, 0.95, 0.24);
   const rows = 6;
+  const cols = 8;
   const segL = gridL / (rows * 2);
+  const step = (gridW - traceW * 0.6) / (cols - 1);
   let x = -gridW / 2 + traceW / 2;
-  while (x <= gridW / 2 - traceW / 2) {
+  for (let c = 0; c < cols; c++) {
     let z = -gridL / 2 + segL / 2;
     for (let i = 0; i < rows; i++) {
       const t = mesh(new THREE.BoxGeometry(traceW, 0.00028, segL * 1.05), foilMatX, x, 0, z, grid);
       z += segL * 2;
     }
-    x += traceW + traceGap;
+    x += step;
   }
   // connecting ends
   const endMat = metal(0xd9a441, 0.95, 0.24);

@@ -171,6 +171,33 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   await sleep(1900);
   await shot('67-sl-sg01-chassis');
 
+  /* ---- sensor pair #2: SG02 + IMU02 ---- */
+  await page.evaluate(() => { window.__SL.setChassis(false); });
+  await sleep(600);
+  await page.evaluate(() => window.__SL.select('SG02'));
+  await sleep(2000);
+  await shot('68-sl-sg02');
+
+  await page.evaluate(() => { window.__SL.setStrain(true); window.__SL.setLoad(0.9); window.__SL.setExplode(0.55); });
+  await sleep(1800);
+  await shot('69-sl-sg02-strain');
+
+  await page.evaluate(() => { window.__SL.setStrain(false); window.__SL.setLoad(0.55); window.__SL.setExplode(0); window.__SL.setChassis(true); });
+  await sleep(2000);
+  await shot('70-sl-sg02-chassis');
+
+  await page.evaluate(() => window.__SL.selectStation('IMU02'));
+  await sleep(2000);
+  await shot('71-sl-imu02-chassis');
+
+  await page.evaluate(() => { window.__SL.setChassis(false); window.__SL.setAxes(true); window.__SL.setRotation('YAW'); });
+  await sleep(1900);
+  await shot('72-sl-imu02-axes');
+
+  await page.evaluate(() => { window.__SL.setAxes(false); window.__SL.setVibration(true); window.__SL.setVibMag(9); window.__SL.setChassis(true); });
+  await sleep(1900);
+  await shot('73-sl-imu02-vibration');
+
   console.log('\nBrowser errors:');
   if (errors.length === 0) console.log('  ✓ none');
   else errors.slice(0, 20).forEach(e => console.log('  ✗ ' + e));

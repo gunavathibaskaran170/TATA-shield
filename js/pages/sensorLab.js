@@ -2,24 +2,26 @@
    SHIELD — SENSOR LAB — engineering inspection viewer
    (SensorDetailViewer in the vanilla zero-build stack)
 
-   · Large interactive 3D inspection of SG01 / IMU01 (switchable)
+   · Large interactive 3D inspection of strain gauges SG01 / SG02 and
+     IMUs IMU01 / IMU02 (shared-family builders, switchable)
    · Camera presets ISO · FRONT · TOP · SIDE · BOTTOM · RESET
    · Smooth exploded / assembled slider
    · Internal (X-ray) mode with component labels
    · Anatomy callouts with live-projected SVG leaders
    · Part selection (raycast) + dim + component info panel
-   · Simulated telemetry (µε / accel / gyro / vibration)
-   · SG01 SHOW STRAIN demo (foil micro-deform + heat overlay)
-   · IMU01 SHOW AXES demo (pitch/roll/yaw)
-   · SHOW ON CHASSIS (front structural context of EV-CH-007)
+   · Simulated telemetry (µε pair check · accel / gyro · FRONT/REAR RMS)
+   · SHOW STRAIN demo (foil micro-deform + heat overlay)
+   · SHOW AXES demo (pitch/roll/yaw) + VIBRATION visualisation
+   · SHOW ON CHASSIS with clickable stations (B1/B2/F1/R1), live sensor
+     tags and ISOLATE-SENSOR transparency (EV-CH-007 structural context)
    · GLB drop-in support: /models/sensors/<ID>.glb if present
    ============================================================ */
 
 import * as THREE from 'three';
 import { createView } from '../core/scene.js';
 import { buildChassis, flashRegion } from '../core/chassis.js';
-import { buildSG01 } from '../core/detail/sg01.js';
-import { buildIMU01 } from '../core/detail/imu01.js';
+import { buildStrainGauge } from '../core/detail/sg01.js';
+import { buildIMU } from '../core/detail/imu01.js';
 import { disposeGroup } from '../core/detail/shared.js';
 import { SENSOR_LAB, LAB_SWITCHER, LAB_IMPLEMENTED, detailById, LAB_PENDING_NOTE } from '../config/sensorDetail.js';
 import { sensorById } from '../config/sensors.js';
@@ -31,7 +33,37 @@ const VIEW_PRESETS = {
   side:    (d) => new THREE.Vector3(1, 0.18, 0).normalize().multiplyScalar(d),
   bottom:  (d) => new THREE.Vector3(0, -1, 0.25).normalize().multiplyScalar(d),
 };
-const CHASSIS_REGIONS = ['B1', 'B2', 'C1', 'F1'];     // front structural context
+const CHASSIS_REGIONS = ['B1', 'B2', 'C1', 'F1', 'R1'];  // front + rear structural context
+
+/* chassis sensor stations — the 4 implemented sensors rendered as
+   pickable mount markers when SHOW ON CHASSIS is active */
+const CHASSIS_STATIONS = [
+  { id: 'SG01', region: 'B1', short: 'Front Left',  pos: [-0.105, 0.045, 0.16], color: '#4fe0a0' },
+  { id: 'SG02', region: 'B2', short: 'Front Right', pos: [0.105, 0.045, 0.16],  color: '#4fe0a0' },
+  { id: 'IMU01', region: 'F1', short: 'Front',      pos: [0, 0.052, 0.18],     color: '#4f8cff' },
+  { id: 'IMU02', region: 'R1', short: 'Rear',       pos: [0, 0.0545, -0.232],  color: '#4f8cff' },
+];
+
+/* IMU station response profiles — front reference vs rear response
+   (rear attenuates the front signal; RMS grows toward the rear). */
+const IMU_PROFILES = {
+  IMU01: {
+    name: 'FRONT', riff: {
+      ax: [0.14, 0.05, 1800], ay: [-0.03, 0.04, 1500], az: [1.01, 0.03, 2600],
+      gx: [3.2, 1.1, 1400], gy: [-1.8, 0.8, 1700], gz: [0.9, 0.6, 2000],
+    },
+    rms: l => 0.13 + 0.19 * l,
+    note: 'front-structure load case — reference station',
+  },
+  IMU02: {
+    name: 'REAR', riff: {
+      ax: [0.09, 0.045, 1750], ay: [0.03, 0.035, 1550], az: [0.99, 0.03, 2650],
+      gx: [1.7, 0.9, 1450], gy: [-0.7, 0.6, 1650], gz: [0.45, 0.5, 1950],
+    },
+    rms: l => 0.22 + 0.06 * l,
+    note: 'rear-structure load case — vibration transmitted through battery region',
+  },
+};
 
 export function createSensorLabPage(host) {
   const page = document.createElement('div');
@@ -92,7 +124,7 @@ export function createSensorLabPage(host) {
       </div>
     </div>
 
-    <div class="sl-note" id="sl-note">SG01 → FRONT-LEFT RAIL (B1) · IMU01 → FRONT CROSS-MEMBER (F1)</div>
+    <div class="sl-note" id="sl-note">SG01 → FRONT-LEFT RAIL (B1) · SG02 → FRONT-RIGHT RAIL (B2) · IMU01 → FRONT CROSS-MEMBER (F1) · IMU02 → REAR STRUCTURE (R1)</div>
 
     <div class="sl-pending" id="sl-pending" style="display:none">
       <div class="sl-pcard">
@@ -177,6 +209,32 @@ export function createSensorLabPage(host) {
   chassisGroup.visible = false;
   V.scene.add(chassisGroup);
 
+  /* mount markers: translucent spheres + click targets for the four
+     implemented stations (label text projected from live telemetry) */
+  const stationGroup = new THREE.Group();
+  stationGroup.name = 'station-markers';
+  stationGroup.visible = false;
+  V.scene.add(stationGroup);
+  CHASSIS_STATIONS.forEach(s => {
+    const m = new THREE.Mesh(
+      new THREE.SphereGeometry(0.008, 16, 12),
+      new THREE.MeshBasicMaterial({ color: s.color, transparent: true, opacity: 0.42, depthWrite: false })
+    );
+    m.position.set(...s.pos);
+    m.userData.sensorId = s.id;
+    m.userData.region = s.region;
+    stationGroup.add(m);
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(0.013, 0.0008, 6, 32),
+      new THREE.MeshBasicMaterial({ color: s.color, transparent: true, opacity: 0.7, depthTest: false, depthWrite: false })
+    );
+    ring.position.copy(m.position);
+    ring.rotation.x = Math.PI / 2;
+    ring.userData.sensorId = s.id;
+    ring.renderOrder = 5;
+    stationGroup.add(ring);
+  });
+
   /* ============================ state ============================ */
   const state = {
     sensorId: 'SG01',
@@ -187,9 +245,11 @@ export function createSensorLabPage(host) {
     strain: false, strainMode: 'TENSION',
     axes: false, rotMode: 'PITCH',
     chassisOn: false,
+    isolate: false,
+    vib: { on: false, mag: 6 },
     load: 0.55,
     selPart: null,
-    glb: { SG01: false, IMU01: false },
+    glb: { SG01: false, SG02: false, IMU01: false, IMU02: false },
   };
 
   let model = null;        // current sensor model { group, parts, refs, labels, cfg, id }
@@ -239,6 +299,7 @@ export function createSensorLabPage(host) {
     state.internal = false; state.anatomy = false;
     state.strain = false; state.axes = false;
     state.selPart = null;
+    if (state.vib.on) { state.vib.on = false; resetVibration(); }
     sensorRoot.rotation.set(0, 0, 0);
     sensorRoot.position.set(0, 0, 0);
     sensorRoot.visible = true;
@@ -247,9 +308,9 @@ export function createSensorLabPage(host) {
     page.querySelector('#sl-anatomy').classList.remove('on');
     page.querySelector('#sl-expl-range').value = 0;
 
-    const builder = id === 'SG01' ? buildSG01 : id === 'IMU01' ? buildIMU01 : null;
+    const builder = (cfg => cfg && cfg.type === 'strain' ? buildStrainGauge : cfg && cfg.type === 'imu' ? buildIMU : null)(detailById(id));
     if (!builder) return;                       // pending sensor — no model
-    model = builder();
+    model = builder(detailById(id));
     sensorRoot.add(model.group);
 
     // GLB override (future CAD drop-in)
@@ -270,13 +331,27 @@ export function createSensorLabPage(host) {
   }
 
   /* ============================ camera ============================ */
+  /* framing bbox over the mechanical stack — the decorative axes triad
+     floats above the cover and must not drive composition */
+  function frameParts(excludeAxes) {
+    // reframe() runs synchronously after position.set() — before the next
+    // render. setFromObject only refreshes the part + children, so push the
+    // parent chain (sensorRoot may just have been moved to/from the chassis
+    // mount) or the bounding box is computed against a stale matrixWorld.
+    sensorRoot.updateWorldMatrix(true, true);
+    const list = [...model.parts.values()].filter(p => !excludeAxes || p.key !== 'axes');
+    const box = new THREE.Box3();
+    list.forEach(p => box.union(new THREE.Box3().setFromObject(p.group)));
+    return box;
+  }
+
   function explodeBounds(t) {
     const saved = new Map();
     model.parts.forEach(p => saved.set(p.key, p.group.position.clone()));
     model.parts.forEach(p => {
       p.group.position.set(0, p.axis.y * p.offset * t, p.axis.z * p.offset * t);
     });
-    const box = new THREE.Box3().setFromObject(model.group);
+    const box = frameParts(true);
     model.parts.forEach(p => p.group.position.copy(saved.get(p.key)));
     return box;
   }
@@ -290,7 +365,7 @@ export function createSensorLabPage(host) {
       dist = 0.42;
     } else if (model) {
       const tEff = Math.max(state.explodeT, state.explodeTarget);
-      const box = tEff > 0.02 ? explodeBounds(tEff) : new THREE.Box3().setFromObject(model.group);
+      const box = tEff > 0.02 ? explodeBounds(tEff) : frameParts(true);
       const size = box.getSize(new THREE.Vector3());
       target.set(0, box.getCenter(new THREE.Vector3()).y, 0);
       dist = Math.max(size.x, size.y * 1.5, size.z) * 1.15;
@@ -331,12 +406,55 @@ export function createSensorLabPage(host) {
       flashRegion(regionGroups[reg], true, regColor, 0.5);
     } else {
       Object.values(regionGroups).forEach(g => flashRegion(g, false));
+      chips[MAX_CHIPS - 1].chip.style.display = 'none';
+      chips[MAX_CHIPS - 1].line.setAttribute('display', 'none');
+      chips[MAX_CHIPS - 1].visible = false;
     }
     bench.visible = !state.chassisOn;
+    stationGroup.visible = state.chassisOn;
     if (model) {
       sensorRoot.position.set(...(state.chassisOn ? model.cfg.mountPos : [0, 0, 0]));
+      sensorRoot.rotation.set(...(state.chassisOn ? (model.cfg.rotation || [0, 0, 0]) : [0, 0, 0]));
     }
+    applyIsolate();
     reframe();
+  }
+
+  /* ISOLATE SENSOR — chassis ~15–25% transparent, sensor opaque */
+  function applyIsolate() {
+    const on = state.isolate && state.chassisOn;
+    // restore first
+    chassisGroup.traverse(o => {
+      if (!o.isMesh) return;
+      const ms = Array.isArray(o.material) ? o.material : [o.material];
+      ms.forEach(m => {
+        if (!m || !m.userData._iso) return;
+        m.opacity = m.userData._iso;
+        m.transparent = m.opacity < 1;
+        delete m.userData._iso;
+        m.needsUpdate = true;
+      });
+    });
+    stationGroup.children.forEach(o => {
+      if (o.isMesh && !(o.userData.sensorId === state.sensorId)) o.material.opacity = 0.08;
+    });
+    if (on) {
+      chassisGroup.traverse(o => {
+        if (!o.isMesh) return;
+        const ms = Array.isArray(o.material) ? o.material : [o.material];
+        ms.forEach(m => {
+          if (!m) return;
+          m.userData._iso = m.opacity;
+          m.transparent = true;
+          m.opacity = 0.18;
+          m.needsUpdate = true;
+        });
+      });
+    } else {
+      stationGroup.children.forEach(o => {
+        if (o.isMesh && o.userData.sensorId) o.material.opacity = 0.42;
+      });
+    }
   }
 
   /* ============================ explode / internal ============================ */
@@ -396,6 +514,14 @@ export function createSensorLabPage(host) {
     if (!model) return null;
     V.setPointer(ev);
     V.raycaster.setFromCamera(V.pointer, V.camera);
+    if (state.chassisOn) {
+      const sh = V.raycaster.intersectObjects(stationGroup.children, true);
+      if (sh.length) {
+        let o = sh[0].object;
+        while (o && !o.userData.sensorId) o = o.parent;
+        if (o && o.userData.sensorId) return { station: o.userData.sensorId, region: o.userData.region };
+      }
+    }
     const targets = [];
     model.parts.forEach(p => p.group.traverse(o => { if (o.isMesh && o.userData.pickable) targets.push(o); }));
     const hits = V.raycaster.intersectObjects(targets, true);
@@ -406,6 +532,11 @@ export function createSensorLabPage(host) {
   }
   function pickPart(ev) {
     const hit = raycast(ev);
+    if (hit && hit.station) {
+      // click on a chassis station: open it (keeps chassis mode) + focus
+      selectSensor(hit.station);
+      return;
+    }
     state.selPart = hit ? hit.partKey : null;
     renderPartDetail();
     renderPartsTab();
@@ -486,8 +617,8 @@ export function createSensorLabPage(host) {
   }
 
   function clampStrainAmp() {
-    const live = readStrainValue();
-    return Math.max(0, Math.min(1.4, (live - 52) / 120));
+    // demo amplitude tracks the load slider (independent of telemetry scale)
+    return Math.max(0, Math.min(1.4, state.load * 1.1 + Math.sin(Date.now() / 2600) * 0.05));
   }
 
   /* ============================ IMU01 axes demo ============================ */
@@ -596,11 +727,49 @@ export function createSensorLabPage(host) {
     });
   }
 
+  /* station tag — camera-facing chip above the mounted sensor
+     ("SG02 · Front Right · 61 µε") with a leader to the mount point */
+  function drawSensorTag() {
+    const idx = MAX_CHIPS - 1;
+    const c = chips[idx];
+    const st = CHASSIS_STATIONS.find(s => s.id === state.sensorId);
+    if (!st || !model) { c.chip.style.display = 'none'; c.line.setAttribute('display', 'none'); return; }
+    const cfg = model.cfg;
+    let val;
+    if (cfg.type === 'strain') { const v = Math.max(0, readStrainValue()); val = `${v.toFixed(0)} µε`; }
+    else {
+      const pf = IMU_PROFILES[state.sensorId];
+      const rms = (pf ? pf.rms(state.load) : 0.22) + Math.random() * 0.02;
+      val = `${rms.toFixed(2)} g RMS`;
+    }
+    const wp = new THREE.Vector3(...st.pos); wp.y += 0.028;
+    wp.applyMatrix4(chassisGroup.matrixWorld);
+    const p = projectToPx(wp);
+    if (!p) { c.chip.style.display = 'none'; c.line.setAttribute('display', 'none'); return; }
+    c.visible = true;
+    c.chip.style.display = 'flex';
+    c.line.setAttribute('display', '');
+    c.line.setAttribute('stroke', st.color);
+    c.el.textContent = `${st.id} · ${st.short} · ${val}`;
+    c.el.style.color = st.color;
+    c.sub.textContent = 'SIMULATED · CLICK TO INSPECT';
+    const w = viewEl.clientWidth, h = viewEl.clientHeight;
+    let lx = Math.min(Math.max(p.x + 16, 8), w - 260);
+    let ly = Math.min(Math.max(p.y - 24, 8), h - 34);
+    c.chip.style.left = lx + 'px';
+    c.chip.style.top = ly + 'px';
+    c.line.setAttribute('x1', lx + 4); c.line.setAttribute('y1', ly + 10);
+    c.line.setAttribute('x2', p.x.toFixed(1)); c.line.setAttribute('y2', p.y.toFixed(1));
+  }
+
   /* ============================ telemetry ============================ */
   let liveAcc = 0;
-  function readStrainValue() {
+  function readStrainValue(id) {
+    const cfg = detailById(id || state.sensorId);
+    if (!cfg || cfg.type !== 'strain') return 0;
+    const tel = cfg.telemetry;
     const now = Date.now();
-    return 50 + state.load * 96 + Math.sin(now / 2200) * 2.4;
+    return tel.expected + state.load * tel.response + Math.sin(now / 2200) * 2.4;
   }
   function tickTelemetry(t) {
     liveAcc += t;
@@ -613,60 +782,88 @@ export function createSensorLabPage(host) {
     const id = state.sensorId;
     const el = page.querySelector('#sl-body');
     if (state.tab !== 'live' || !el) return;
-    if (id === 'SG01') {
-      const cur = Math.max(0, readStrainValue());
-      const exp = 50, base = 48;
-      const res = cur - exp;
-      const ratio = cur / exp;
-      const status = ratio > 2.0 ? 'CRITICAL' : ratio > 1.5 ? 'ELEVATED' : 'NORMAL';
-      const stClass = status === 'NORMAL' ? 'ok' : status === 'ELEVATED' ? 'warn' : 'crit';
-      el.innerHTML = `
-        <div class="sl-rows2">
-          <div class="sl-kv"><span>Measurement</span><b>Local longitudinal strain</b></div>
-          <div class="sl-kv"><span>Unit</span><b>µε (microstrain)</b></div>
-        </div>
-        <div class="sl-gauge">
-          <div class="sl-gbar"><i style="width:${Math.min(100, (cur / 250) * 100)}%"></i></div>
-          <div class="sl-gnum">${cur.toFixed(1)} <u>µε</u></div>
-        </div>
-        <div class="sl-rows2">
-          <div class="sl-kv"><span>Current</span><b>${cur.toFixed(1)} µε</b></div>
-          <div class="sl-kv"><span>Expected</span><b>${exp} µε</b></div>
-          <div class="sl-kv"><span>Baseline</span><b>${base} µε</b></div>
-          <div class="sl-kv"><span>Residual</span><b class="${res > 0 ? 'warn' : 'ok'}">${res > 0 ? '+' : ''}${res.toFixed(1)} µε</b></div>
-        </div>
-        <div class="sl-status ${stClass}"><span class="dot"></span>${status} — ${stClass === 'NORMAL' ? 'within design envelope' : stClass === 'ELEVATED' ? 'above expected envelope — review' : 'design envelope exceeded — inspect structure'}</div>
-        <div class="sl-rows2">
-          <div class="sl-kv"><span>Load / Baseline</span><b>${Math.round(state.load * 100)} %</b></div>
-          <div class="sl-kv"><span>Heat overlay</span><b>${(Math.min(1, clampStrainAmp() * 1.15 + 0.06) * 100).toFixed(0)} %</b></div>
-        </div>
-        <div class="sl-sim">SIMULATED DATA — foil heat overlay tied to structural load</div>`;
-    } else if (id === 'IMU01') {
-      const l = state.load;
-      const n = Date.now();
-      const Ax = 0.14 * l + Math.sin(n / 1800) * 0.05;
-      const Ay = -0.03 + Math.cos(n / 1500) * 0.04;
-      const Az = 1.01 + Math.sin(n / 2600) * 0.03;
-      const Gx = 3.2 * l + Math.sin(n / 1400) * 1.1;
-      const Gy = -1.8 * l + Math.cos(n / 1700) * 0.8;
-      const Gz = 0.9 * l + Math.sin(n / 2000) * 0.6;
-      const vib = 0.13 + 0.19 * l + (Math.random() * 0.02);
-      const axis = (arr, u) => `<div class="sl-axis" style="--ac:${model.cfg.accent}">${arr.map(v => `<div><span>${v.l}</span><i style="width:${Math.min(100, Math.abs(v.v) * 52)}%"></i><b>${v.v >= 0 ? '+' : ''}${v.v.toFixed(2)} ${u}</b></div>`).join('')}</div>`;
-      el.innerHTML = `
-        <div class="sl-rows2">
-          <div class="sl-kv"><span>Sensor</span><b>6-DOF MEMS (accel + gyro)</b></div>
-          <div class="sl-kv"><span>Status</span><b class="ok">NORMAL</b></div>
-        </div>
-        <div class="sl-live-sec">ACCELERATION <i>(g)</i></div>
-        ${axis([{ l: 'Ax', v: Ax }, { l: 'Ay', v: Ay }, { l: 'Az', v: Az }], 'g')}
-        <div class="sl-live-sec">ANGULAR VELOCITY <i>(°/s)</i></div>
-        ${axis([{ l: 'Gx', v: Gx }, { l: 'Gy', v: Gy }, { l: 'Gz', v: Gz }], '°/s')}
-        <div class="sl-rows2">
-          <div class="sl-kv"><span>Vibration RMS</span><b>${vib.toFixed(2)} g</b></div>
-          <div class="sl-kv"><span>Axes</span><b>X·Y·Z</b></div>
-        </div>
-        <div class="sl-sim">SIMULATED DATA — MEMS model driven by the front-structure load case</div>`;
-    }
+    const cfg = model.cfg;
+    if (cfg.type === 'strain') renderStrainLive(el, cfg, id);
+    else if (cfg.type === 'imu') renderIMULive(el, cfg, id);
+  }
+
+  function renderStrainLive(el, cfg, id) {
+    const tel = cfg.telemetry;
+    const cur = Math.max(0, readStrainValue(id));
+    const exp = tel.expected, base = tel.baseline;
+    const res = cur - exp;
+    const ratio = cur / exp;
+    const status = ratio > 2.0 ? 'CRITICAL' : ratio > 1.5 ? 'ELEVATED' : 'NORMAL';
+    const stClass = status === 'NORMAL' ? 'ok' : status === 'ELEVATED' ? 'warn' : 'crit';
+    // left/right pair check — SG02 reads higher than SG01 under uneven load
+    const s01 = Math.max(0, readStrainValue('SG01'));
+    const s02 = Math.max(0, readStrainValue('SG02'));
+    const asym = (s02 - s01) / (s01 || 1);
+    el.innerHTML = `
+      <div class="sl-rows2">
+        <div class="sl-kv"><span>Measurement</span><b>Local longitudinal strain</b></div>
+        <div class="sl-kv"><span>Unit</span><b>µε (microstrain)</b></div>
+      </div>
+      <div class="sl-gauge">
+        <div class="sl-gbar"><i style="width:${Math.min(100, (cur / 250) * 100)}%"></i></div>
+        <div class="sl-gnum">${cur.toFixed(1)} <u>µε</u></div>
+      </div>
+      <div class="sl-rows2">
+        <div class="sl-kv"><span>Current</span><b>${cur.toFixed(1)} µε</b></div>
+        <div class="sl-kv"><span>Expected</span><b>${exp} µε</b></div>
+        <div class="sl-kv"><span>Baseline</span><b>${base} µε</b></div>
+        <div class="sl-kv"><span>Residual</span><b class="${res > 0 ? 'warn' : 'ok'}">${res > 0 ? '+' : ''}${res.toFixed(1)} µε</b></div>
+      </div>
+      <div class="sl-status ${stClass}"><span class="dot"></span>${status} — ${stClass === 'NORMAL' ? 'within design envelope' : stClass === 'ELEVATED' ? 'above expected envelope — review' : 'design envelope exceeded — inspect structure'}</div>
+      <div class="sl-live-sec">LEFT / RIGHT PAIR CHECK <i>(same load)</i></div>
+      <div class="sl-rows2">
+        <div class="sl-kv"><span>SG01 · Front-Left</span><b>${s01.toFixed(1)} µε</b></div>
+        <div class="sl-kv"><span>SG02 · Front-Right</span><b>${s02.toFixed(1)} µε</b></div>
+        <div class="sl-kv"><span>Asymmetry</span><b class="${asym > 0.06 ? 'warn' : 'ok'}">${(asym * 100).toFixed(1)} %</b></div>
+      </div>
+      <div class="sl-rows2">
+        <div class="sl-kv"><span>Load / Baseline</span><b>${Math.round(state.load * 100)} %</b></div>
+        <div class="sl-kv"><span>Heat overlay</span><b>${(Math.min(1, clampStrainAmp() * 1.15 + 0.06) * 100).toFixed(0)} %</b></div>
+      </div>
+      <div class="sl-sim">SIMULATED DATA — ${id === 'SG02' ? 'front-right station responds more than front-left under asymmetric load transfer' : 'foil heat overlay tied to structural load'}</div>`;
+  }
+
+  function renderIMULive(el, cfg, id) {
+    const l = state.load;
+    const n = Date.now();
+    const pf = IMU_PROFILES[id] || IMU_PROFILES.IMU01;
+    const r = pf.riff;
+    const val = (base, amp, per) => base * l + Math.sin(n / per) * amp;
+    const Ax = val(...r.ax), Ay = val(...r.ay), Az = val(...r.az);
+    const Gx = val(...r.gx), Gy = val(...r.gy), Gz = val(...r.gz);
+    const vib = pf.rms(l) + Math.random() * 0.02;
+    const rmsF = IMU_PROFILES.IMU01.rms(l) + Math.random() * 0.02;
+    const rmsR = IMU_PROFILES.IMU02.rms(l) + Math.random() * 0.02;
+    const axis = (arr, u) => `<div class="sl-axis" style="--ac:${cfg.accent}">${arr.map(v => `<div><span>${v.l}</span><i style="width:${Math.min(100, Math.abs(v.v) * 52)}%"></i><b>${v.v >= 0 ? '+' : ''}${v.v.toFixed(2)} ${u}</b></div>`).join('')}</div>`;
+    el.innerHTML = `
+      <div class="sl-rows2">
+        <div class="sl-kv"><span>Sensor</span><b>6-DOF MEMS (accel + gyro)</b></div>
+        <div class="sl-kv"><span>Status</span><b class="ok">NORMAL</b></div>
+      </div>
+      <div class="sl-live-sec">ACCELERATION <i>(g)</i></div>
+      ${axis([{ l: 'Ax', v: Ax }, { l: 'Ay', v: Ay }, { l: 'Az', v: Az }], 'g')}
+      <div class="sl-live-sec">ANGULAR VELOCITY <i>(°/s)</i></div>
+      ${axis([{ l: 'Gx', v: Gx }, { l: 'Gy', v: Gy }, { l: 'Gz', v: Gz }], '°/s')}
+      <div class="sl-rows2">
+        <div class="sl-kv"><span>Vibration RMS</span><b>${vib.toFixed(2)} g</b></div>
+        <div class="sl-kv"><span>Axes</span><b>X·Y·Z</b></div>
+      </div>
+      <div class="sl-live-sec">FRONT / REAR RESPONSE <i>(g RMS)</i></div>
+      <div class="sl-fr">
+        <div class="sl-frbar"><span class="frl">${IMU_PROFILES.IMU01.name}</span><i style="width:${Math.min(100, (rmsF / 0.5) * 100)}%"></i><b>${rmsF.toFixed(2)} g</b></div>
+        <div class="sl-frbar"><span class="frl">${IMU_PROFILES.IMU02.name}</span><i style="width:${Math.min(100, (rmsR / 0.5) * 100)}%"></i><b>${rmsR.toFixed(2)} g</b></div>
+        <div class="sl-kv" style="margin-top:6px"><span>Rear / Front ratio</span><b class="${rmsR > rmsF ? 'warn' : 'ok'}">${(rmsR / rmsF).toFixed(2)}</b></div>
+      </div>
+      <div class="sl-rows2">
+        <div class="sl-kv"><span>Vibration mag.</span><b>${state.vib.on ? `× ${state.vib.mag}` : 'OFF'}</b></div>
+        <div class="sl-kv"><span>Station</span><b>${pf.name}</b></div>
+      </div>
+      <div class="sl-sim">SIMULATED DATA — MEMS model driven by the ${pf.name.toLowerCase()}-structure load case</div>`;
   }
 
   /* ============================ panel renders ============================ */
@@ -701,7 +898,7 @@ export function createSensorLabPage(host) {
   }
 
   function regionName(id) {
-    const r = { B1: 'Front-Left Rail', B2: 'Front-Right Rail', F1: 'Front Structural Zone', C1: 'Central Floor / Battery' }[id];
+    const r = { B1: 'Front-Left Rail', B2: 'Front-Right Rail', F1: 'Front Structural Zone', C1: 'Central Floor / Battery', R1: 'Rear Structural Zone', B3: 'Rear-Left Battery Mount', B4: 'Rear-Right Battery Mount' }[id];
     return r || id;
   }
 
@@ -752,13 +949,16 @@ export function createSensorLabPage(host) {
     const host = page.querySelector('#sl-demo');
     host.innerHTML = '';
     if (!model) return;
-    if (state.sensorId === 'SG01') {
+    const type = model.cfg.type;
+    if (type === 'strain') {
       host.innerHTML = `
         <button class="btn" id="sl-strain">⇆ SHOW STRAIN</button>
-        <button class="btn small" id="sl-strain-mode">TENSION</button>
+        <button class="btn small" id="sl-strain-mode">${state.strainMode}</button>
         <span class="sl-lbl" style="margin-left:8px">LOAD</span>
         <input id="sl-load" type="range" min="0" max="100" value="${Math.round(state.load * 100)}" style="width:120px">
-        <span class="sl-loadv mono" id="sl-loadv">${Math.round(state.load * 100)}%</span>`;
+        <span class="sl-loadv mono" id="sl-loadv">${Math.round(state.load * 100)}%</span>
+        <span class="sep"></span>
+        <button class="btn" id="sl-isolate">⊚ ISOLATE</button>`;
       host.querySelector('#sl-strain').addEventListener('click', e => {
         state.strain = !state.strain;
         e.currentTarget.classList.toggle('on', state.strain);
@@ -770,16 +970,26 @@ export function createSensorLabPage(host) {
         e.currentTarget.classList.toggle('on', state.strainMode === 'COMPRESSION');
       });
       host.querySelector('#sl-load').addEventListener('input', e => setLoad(+e.target.value / 100));
-    } else if (state.sensorId === 'IMU01') {
+      host.querySelector('#sl-isolate').addEventListener('click', e => {
+        state.isolate = !state.isolate;
+        e.currentTarget.classList.toggle('on', state.isolate);
+        applyIsolate();
+      });
+    } else if (type === 'imu') {
       host.innerHTML = `
         <button class="btn" id="sl-axes">◆ SHOW AXES</button>
         <button class="btn small mx on" data-m="PITCH">PITCH</button>
         <button class="btn small mx" data-m="ROLL">ROLL</button>
         <button class="btn small mx" data-m="YAW">YAW</button>
+        <button class="btn" id="sl-vib">≋ VIBRATION</button>
+        <input id="sl-vibmag" type="range" min="1" max="20" value="${state.vib.mag}" style="width:80px" title="vibration visualisation magnification">
+        <span class="sl-loadv mono" id="sl-vibv">×${state.vib.mag}</span>
         <span class="sl-lbl" style="margin-left:8px">LOAD</span>
         <input id="sl-load" type="range" min="0" max="100" value="${Math.round(state.load * 100)}" style="width:120px">
         <span class="sl-loadv mono" id="sl-loadv">${Math.round(state.load * 100)}%</span>
-        <span class="sl-att" id="sl-attitude"></span>`;
+        <span class="sl-att" id="sl-attitude"></span>
+        <span class="sep"></span>
+        <button class="btn" id="sl-isolate">⊚ ISOLATE</button>`;
       host.querySelector('#sl-axes').addEventListener('click', e => {
         state.axes = !state.axes;
         e.currentTarget.classList.toggle('on', state.axes);
@@ -788,7 +998,22 @@ export function createSensorLabPage(host) {
         state.rotMode = b.dataset.m;
         host.querySelectorAll('.mx').forEach(x => x.classList.toggle('on', x === b));
       }));
+      host.querySelector('#sl-vib').addEventListener('click', e => {
+        state.vib.on = !state.vib.on;
+        e.currentTarget.classList.toggle('on', state.vib.on);
+        if (!state.vib.on) resetVibration();
+      });
+      host.querySelector('#sl-vibmag').addEventListener('input', e => {
+        state.vib.mag = +e.target.value;
+        const v = host.querySelector('#sl-vibv');
+        if (v) v.textContent = '×' + state.vib.mag;
+      });
       host.querySelector('#sl-load').addEventListener('input', e => setLoad(+e.target.value / 100));
+      host.querySelector('#sl-isolate').addEventListener('click', e => {
+        state.isolate = !state.isolate;
+        e.currentTarget.classList.toggle('on', state.isolate);
+        applyIsolate();
+      });
     }
   }
 
@@ -797,6 +1022,33 @@ export function createSensorLabPage(host) {
     const el = page.querySelector('#sl-loadv');
     if (el) el.textContent = Math.round(state.load * 100) + '%';
     if (state.tab === 'live') refreshLive();
+  }
+
+  /* ============================ vibration demo (IMU) ============================ */
+  function tickVibration(t) {
+    const mag = state.vib.mag;
+    if (model && state.chassisOn) {
+      chassisGroup.position.y = Math.sin(t * 42) * 0.0005 * mag;
+      chassisGroup.rotation.z = Math.sin(t * 27) * 0.00006 * mag;
+      chassisGroup.rotation.x = Math.sin(t * 23) * 0.00005 * mag;
+    } else if (model) {
+      const ph = Math.sin(t * 46);
+      sensorRoot.position.y = ph * 0.0006 * mag;
+      sensorRoot.rotation.z = Math.cos(t * 31) * 0.0004 * mag;
+      sensorRoot.rotation.x = Math.sin(t * 29) * 0.0004 * mag;
+    }
+    const el = page.querySelector('#sl-attitude');
+    if (el && state.vib.on) el.textContent = `VIBRATION VISUALISATION ×${mag}`;
+  }
+  function resetVibration() {
+    chassisGroup.position.set(0, 0, 0);
+    chassisGroup.rotation.set(0, 0, 0);
+    if (model) {
+      if (state.chassisOn) sensorRoot.position.set(...model.cfg.mountPos);
+      else sensorRoot.position.set(0, 0, 0);
+    }
+    const el = page.querySelector('#sl-attitude');
+    if (el && !state.axes) el.textContent = '';
   }
 
   /* ============================ frame loop ============================ */
@@ -812,14 +1064,15 @@ export function createSensorLabPage(host) {
     applyExplode();
     applyInternal();
     updateSelection();
-    if (state.strain && state.sensorId === 'SG01') tickStrain(t);
-    if (state.axes && state.sensorId === 'IMU01') tickAxes(t);
-    else if (!state.axes && state.sensorId === 'IMU01') easeBackAxes(dt);
-    if (model && state.chassisOn && model.cfg) {
-      // gentle periodic dwell highlight on the mount region (QA-friendly, cheap)
-    }
+    const type = model && model.cfg ? model.cfg.type : null;
+    if (state.strain && type === 'strain') tickStrain(t);
+    if (state.axes && type === 'imu') tickAxes(t);
+    else if (!state.axes && type === 'imu') easeBackAxes(dt);
+    if (state.vib.on && type === 'imu') tickVibration(t);
+    else if (!state.vib.on && type === 'imu') resetVibration();
     if (state.internal) drawInternalLabels();
     else if (state.anatomy) drawLabels();
+    if (model && state.chassisOn) drawSensorTag();
     V.updateTween(dt);
     tickTelemetry(t);
   }
@@ -871,6 +1124,9 @@ export function createSensorLabPage(host) {
     sensorRoot.visible = true;
     bench.visible = !state.chassisOn;
     await mountSensor(id);
+    // if we came via a chassis station click, re-apply the chassis state
+    // (mount position, orientation, region flash) for the new sensor
+    if (state.chassisOn) applyChassisState();
   }
 
   /* ============================ controls ============================ */
@@ -949,7 +1205,11 @@ export function createSensorLabPage(host) {
     setLoad: setLoad,
     setAxes: b => { state.axes = !!b; },
     setRotation: m => { state.rotMode = m; },
+    setVibration: b => { state.vib.on = !!b; },
+    setVibMag: m => { state.vib.mag = Math.max(1, Math.min(20, +m || 1)); },
+    setIsolate: b => { state.isolate = !!b; applyIsolate(); },
     setChassis: b => { state.chassisOn = !!b; applyChassisState(); },
+    selectStation: id => selectSensor(id),
     selectPart: k => { state.selPart = k; renderPartDetail(); renderPartsTab(); },
     resetView: () => { state.view = 'iso'; reframe(); },
     probe: () => probe(),
@@ -967,7 +1227,20 @@ export function createSensorLabPage(host) {
         view: state.view, explodeT: +state.explodeT.toFixed(2), internal: state.internal,
         anatomy: state.anatomy, strain: state.strain, axes: state.axes,
         rotMode: state.rotMode, chassis: state.chassisOn, load: +state.load.toFixed(2), selPart: state.selPart,
+        isolate: state.isolate, vibOn: state.vib.on, vibMag: state.vib.mag,
       },
+      stations: CHASSIS_STATIONS.map(s => ({ id: s.id, region: s.region, pos: s.pos })),
+      stationMarkers: stationGroup.children.length,
+      mountPos: model && state.chassisOn ? model.cfg.mountPos : null,
+      rotation: model && model.cfg.rotation ? model.cfg.rotation : [0, 0, 0],
+      live: model ? {
+        type: model.cfg.type,
+        value: model.cfg.type === 'strain' ? +Math.max(0, readStrainValue()).toFixed(1) : +(IMU_PROFILES[state.sensorId] ? IMU_PROFILES[state.sensorId].rms(state.load) : 0).toFixed(2),
+        expected: model.cfg.telemetry ? model.cfg.telemetry.expected : null,
+      } : null,
+      tagVisible: chips[MAX_CHIPS - 1].visible,
+      chassisOpacity: (() => { let o = null; chassisGroup.traverse(m => { if (o === null && m.isMesh && m.material) o = (Array.isArray(m.material) ? m.material[0] : m.material).opacity; }); return o; })(),
+      mountRegion: model && state.chassisOn && model.cfg ? model.cfg.region : null,
       view: { w: Math.round(rect.width), h: Math.round(rect.height) },
       chipsVisible: chips.filter(c => c.visible).length,
       labels: model ? model.labels.length : 0,

@@ -144,7 +144,96 @@ const ok = (cond, msg) => { if (cond) { pass++; console.log('  ✓ ' + msg); } e
   p = await page.evaluate(() => window.__SL.probe());
   ok(p.sensor === 'SG01', 'switched back to SG01');
   ok(p.partKeys.includes('gauge'), 'SG01 re-mount OK');
+  const sg01MeshCount = p.meshCount;
   await page.evaluate(() => window.__SL.setChassis(false));
+
+  /* ---- SG02 — front-right strain (family reuse) ---- */
+  console.log('\n[Sensor Lab — SG02]');
+  await page.evaluate(() => window.__SL.select('SG02'));
+  await sleep(1600);
+  p = await page.evaluate(() => window.__SL.probe());
+  ok(p.sensor === 'SG02' && p.modelLoaded, 'SG02 model loaded');
+  ok(p.partKeys.includes('gauge') && p.partKeys.includes('housing') && p.partKeys.includes('pcb') && p.partKeys.includes('cover'), 'SG02 reuses SG01 strain-sensor family (gauge / housing / pcb / cover)');
+  ok(p.partKeys.includes('bolts') && p.partKeys.includes('cable') && p.partKeys.includes('connector'), 'SG02 hardware parts: bolts / cable / connector');
+  ok(p.meshCount === sg01MeshCount, `SG02 geometry identical to SG01 family (${p.meshCount} meshes = ${sg01MeshCount})`);
+  ok(p.labels === 7 && p.internalLabels === 5, 'SG02 anatomy (7) + internal (5) labels from family config');
+  ok(p.live && p.live.type === 'strain' && p.live.expected === 54, `SG02 telemetry expected 54 µε (${p.live.expected})`);
+
+  /* ---- SG02 strain + heat demo ---- */
+  await page.evaluate(() => { window.__SL.setStrain(true); window.__SL.setLoad(0.9); });
+  await sleep(900);
+  p = await page.evaluate(() => window.__SL.probe());
+  ok(p.state.strain && p.state.load > 0.89, 'SG02 SHOW STRAIN demo active');
+  const s2Live = await page.evaluate(() => { document.querySelector('[data-t="live"]').click(); return new Promise(r => setTimeout(() => r(document.querySelector('#sl-body').innerText || ''), 400)); });
+  ok(/SG01 · Front-Left/.test(s2Live) && /SG02 · Front-Right/.test(s2Live), 'left/right pair check rendered');
+  const asymOk = await page.evaluate(() => {
+    const el = document.querySelector('#sl-body');
+    const t = el.innerText || '';
+    const m = t.match(/Asymmetry\s+([\d.]+)\s*%/);
+    return m ? +m[1] > 0 : false;
+  });
+  ok(asymOk, 'SG02 reads higher than SG01 — asymmetric load transfer shown');
+  await page.evaluate(() => { window.__SL.setStrain(false); window.__SL.setLoad(0.55); });
+
+  /* ---- SG02 chassis mount (front-right rail = B2) ---- */
+  await page.evaluate(() => window.__SL.setChassis(true));
+  await sleep(1200);
+  p = await page.evaluate(() => window.__SL.probe());
+  ok(p.state.chassis && p.sensor === 'SG02', 'SHOW ON CHASSIS with SG02');
+  ok(JSON.stringify(p.mountPos) === JSON.stringify([0.105, 0.045, 0.16]), `SG02 mounted front-RIGHT rail ${JSON.stringify(p.mountPos)} (mirrored from SG01)`);
+  ok(p.tagVisible, 'station label tag visible on chassis');
+  const tagTxt = await page.evaluate(() => { const vis = [...document.querySelectorAll('.sl-chip')].filter(x => x.style.display === 'flex'); return vis.length ? (vis[vis.length - 1].innerText || '') : ''; });
+  ok(/SG02/.test(tagTxt) && /Front Right/.test(tagTxt), `tag text "${tagTxt.trim().split('\n')[0].slice(0, 44)}…`);
+
+  /* ---- station click: SG02 → IMU02 while in chassis mode ---- */
+  await page.evaluate(() => window.__SL.selectStation('IMU02'));
+  await sleep(1700);
+  p = await page.evaluate(() => window.__SL.probe());
+  ok(p.sensor === 'IMU02' && p.state.chassis, 'station click switched to IMU02 (chassis mode kept)');
+
+  /* ---- IMU02 — rear IMU (family reuse) ---- */
+  console.log('\n[Sensor Lab — IMU02]');
+  ok(p.modelLoaded, 'IMU02 model loaded');
+  ok(p.partKeys.includes('cover') && p.partKeys.includes('damping') && p.partKeys.includes('gasket') && p.partKeys.includes('axes'), 'IMU02 reuses IMU01 architecture (cover / damping / gasket / axes)');
+  ok(p.partKeys.length === 9, `9 IMU02 parts (${p.partKeys.length})`);
+  ok(p.labels === 8, '8 IMU02 anatomy labels');
+  ok(JSON.stringify(p.mountPos) === JSON.stringify([0, 0.0545, -0.232]), `IMU02 mounted REAR structural deck ${JSON.stringify(p.mountPos)}`);
+  ok(JSON.stringify(p.rotation) === JSON.stringify([0, 0, 0]), 'IMU02 axes aligned with chassis axes (rotation 0,0,0)');
+
+  /* ---- IMU02 live: FRONT/REAR response ---- */
+  const imu2Live = await page.evaluate(() => { document.querySelector('[data-t="live"]').click(); return new Promise(r => setTimeout(() => r(document.querySelector('#sl-body').innerText || ''), 400)); });
+  ok(/FRONT/.test(imu2Live) && /REAR/.test(imu2Live) && /Vibration RMS/.test(imu2Live), 'IMU02 live shows FRONT/REAR response + vibration RMS');
+  ok(/Ax/.test(imu2Live) && /Az/.test(imu2Live) && /Gz/.test(imu2Live), 'IMU02 6-axis telemetry (Ax Ay Az · Gx Gy Gz)');
+
+  /* ---- IMU02 axes demo ---- */
+  await page.evaluate(() => { window.__SL.setAxes(true); window.__SL.setRotation('ROLL'); });
+  await sleep(800);
+  p = await page.evaluate(() => window.__SL.probe());
+  ok(p.state.axes && p.state.rotMode === 'ROLL', 'IMU02 axes demo ROLL active');
+
+  /* ---- IMU02 vibration mode ---- */
+  await page.evaluate(() => { window.__SL.setVibration(true); window.__SL.setVibMag(10); });
+  await sleep(800);
+  p = await page.evaluate(() => window.__SL.probe());
+  ok(p.state.vibOn && p.state.vibMag === 10, `vibration mode on (magnification ×${p.state.vibMag})`);
+  const vibTxt = await page.evaluate(() => (document.querySelector('#sl-attitude') || {}).textContent || '');
+  ok(/VIBRATION VISUALISATION/.test(vibTxt), `vibration readout: ${vibTxt.slice(0, 30)}`);
+  await page.evaluate(() => window.__SL.setVibration(false));
+
+  /* ---- ISOLATE SENSOR (chassis ~18% opaque, sensor opaque) ---- */
+  await page.evaluate(() => window.__SL.setIsolate(true));
+  await sleep(600);
+  p = await page.evaluate(() => window.__SL.probe());
+  ok(p.state.isolate, 'ISOLATE SENSOR active');
+  ok(p.chassisOpacity !== null && p.chassisOpacity < 0.3, `chassis dimmed to ${p.chassisOpacity}`);
+  await page.evaluate(() => { window.__SL.setIsolate(false); window.__SL.setChassis(false); });
+  await sleep(600);
+
+  /* ---- SG02 still fine after switching back ---- */
+  await page.evaluate(() => window.__SL.select('SG02'));
+  await sleep(1400);
+  p = await page.evaluate(() => window.__SL.probe());
+  ok(p.sensor === 'SG02' && p.modelLoaded && !p.state.chassis, 'back to SG02 docked');
 
   /* ---- nav order ---- */
   ok(p.nav[0].includes('Twin') && p.nav[1].includes('Hardware Twin'), 'nav twin order preserved');

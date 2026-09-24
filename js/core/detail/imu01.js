@@ -1,11 +1,12 @@
 /* ============================================================
-   SHIELD — Sensor Lab — IMU01 inertial measurement unit
-   Real interactive 3D geometry:
-      blue anodized base housing -> silicone damping layer ->
-      IMU PCB (MEMS + conditioning) -> sealing gasket ->
-      top cover (4 × M6 screws) + gland / shielded cable /
-      M12-6pin + body-fixed XYZ triad.
-   Built in metres; origin = base bottom centre.
+   SHIELD — Sensor Lab — IMUSensor family builder
+   One physical architecture shared by IMU01 / IMU02 (front and
+   rear stations): blue anodized base housing -> silicone damping
+   layer -> IMU PCB (MEMS + conditioning) -> sealing gasket ->
+   top cover (4 × M6 screws) + gland / shielded cable / M12-6pin
+   + body-fixed XYZ triad (X red · Y green · Z blue).
+   Driven entirely by sensorConfig. Built in metres; origin =
+   base bottom centre.
    ============================================================ */
 
 import * as THREE from 'three';
@@ -15,10 +16,9 @@ import {
   buildM12, buildPCB, makeDecal, buildTriad, makePart, tag,
 } from './shared.js';
 
-const CFG = SENSOR_LAB.IMU01;
 const mm = v => v * 0.001;
 
-export function buildIMU01() {
+export function buildIMU(cfg) {
   const group = new THREE.Group();
   const parts = new Map();
   const refs = {};
@@ -27,7 +27,7 @@ export function buildIMU01() {
     const g = new THREE.Group();
     g.userData.home = new THREE.Vector3();
     group.add(g);
-    const def = CFG.parts.find(p => p.key === key);
+    const def = cfg.parts.find(p => p.key === key);
     const part = { key, group: g, axis: new THREE.Vector3(0, 1, 0), offset: mm(def.expl) };
     parts.set(key, part);
     return g;
@@ -96,10 +96,10 @@ export function buildIMU01() {
     const boss = mesh(new THREE.CylinderGeometry(mm(6), mm(6), mm(2.4), 20), M.ANOD_DEEP(), 0, mm(24.2), mm(21.5), cover);
     boss.rotation.x = Math.PI / 2;
     // engraved marking
-    const dec = makeDecal('IMU01 · SHIELD', mm(34), mm(5), { c1: '#4f8cff', c2: '#d9ecff' });
+    const dec = makeDecal(`${cfg.id} · SHIELD`, mm(34), mm(5), { c1: '#4f8cff', c2: '#d9ecff' });
     dec.position.set(0, mm(25.15), 0);
     cover.add(dec);
-    const decSub = makeDecal('6-DOF INERTIAL MEASUREMENT UNIT', mm(40), mm(2.6), { c1: '#6d8bb8', c2: '#9fc0f0', scale: 0.62, opacity: 0.6 });
+    const decSub = makeDecal(cfg.coverSub || '6-DOF INERTIAL MEASUREMENT UNIT', mm(40), mm(2.6), { c1: '#6d8bb8', c2: '#9fc0f0', scale: 0.62, opacity: 0.6 });
     decSub.position.set(0, mm(25.15), mm(9));
     cover.add(decSub);
     refs.coverMat = mat;
@@ -150,16 +150,21 @@ export function buildIMU01() {
 
   /* ---------- part tagging ---------- */
   for (const [key, part] of parts) {
-    tag(part.group, key, CFG.parts.find(p => p.key === key).label);
+    tag(part.group, key, cfg.parts.find(p => p.key === key).label);
   }
 
   /* ---------- anatomy anchors ---------- */
-  const labels = CFG.labels.map(l => ({
+  const labels = cfg.labels.map(l => ({
     key: l.key,
     text: l.text,
     sub: l.sub,
     anchor: new THREE.Vector3(mm(l.anchor[0]), mm(l.anchor[1]), mm(l.anchor[2])),
   }));
 
-  return { group, parts, refs, labels, cfg: CFG, id: 'IMU01' };
+  return { group, parts, refs, labels, cfg, id: cfg.id };
 }
+
+/* IMU01 / IMU02 are the same IMUSensor family — identical
+   geometry, different config (station, id, telemetry). */
+export const buildIMU01 = () => buildIMU(SENSOR_LAB.IMU01);
+export const buildIMU02 = () => buildIMU(SENSOR_LAB.IMU02);
