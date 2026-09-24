@@ -203,14 +203,50 @@ function buildEdgeNode() {
   body.castShadow = true;
   g.add(body);
 
-  // top lid with accent
+  // machined rim of the enclosure mouth
+  const rim = new THREE.Mesh(
+    new THREE.BoxGeometry(0.092, 0.003, 0.030),
+    metal(0x7c8ea8, 0.9, 0.3)
+  );
+  rim.position.y = 0.0175;
+  g.add(rim);
+
+  // hinged lid, shown open
+  const lidPivot = new THREE.Group();
+  lidPivot.position.set(0, 0.018, -0.015);
+  lidPivot.rotation.x = -2.0;
   const lid = new THREE.Mesh(
     new THREE.BoxGeometry(0.092, 0.004, 0.03),
     new THREE.MeshStandardMaterial({ color: 0x38d9cf, metalness: 0.85, roughness: 0.28 })
   );
-  lid.position.y = 0.02;
+  lid.position.set(0, 0.002, 0.015);
   lid.castShadow = true;
-  g.add(lid);
+  lidPivot.add(lid);
+  const hinge = new THREE.Mesh(new THREE.CylinderGeometry(0.0022, 0.0022, 0.086, 8), metal(0x9aa8bd, 0.9, 0.3));
+  hinge.rotation.z = Math.PI / 2;
+  lidPivot.add(hinge);
+  g.add(lidPivot);
+
+  // ---- visible PCB inside the enclosure ----
+  const pcb = new THREE.Mesh(new THREE.BoxGeometry(0.076, 0.0022, 0.02),
+    new THREE.MeshStandardMaterial({ color: 0x1c5c33, metalness: 0.1, roughness: 0.6 }));
+  pcb.position.y = 0.004;
+  g.add(pcb);
+  const esp = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.003, 0.014), metal(0x2a3545, 0.5, 0.5));
+  esp.position.set(-0.018, 0.0065, 0);
+  g.add(esp);
+  const adc = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.004, 0.01), metal(0x11151c, 0.4, 0.6));
+  adc.position.set(0.012, 0.007, -0.003);
+  g.add(adc);
+  const terminal = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.006, 0.008),
+    new THREE.MeshStandardMaterial({ color: 0xff7a1a, metalness: 0.1, roughness: 0.6 }));
+  terminal.position.set(0.026, 0.008, 0.007);
+  g.add(terminal);
+  for (let ci = 0; ci < 2; ci++) {
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.007, 10), metal(0xcfd8e6, 0.9, 0.3));
+    cap.position.set(0.028 - ci * 0.012, 0.0085, -0.006);
+    g.add(cap);
+  }
 
   // vents
   for (let i = 0; i < 4; i++) {
@@ -241,6 +277,30 @@ function buildEdgeNode() {
     const lb = makeLabel(n, { color: '#5f7088', spriteScale: 0.016 });
     lb.position.set(-0.036 + i * 0.009, 0.0085, 0.018);
     g.add(lb);
+  });
+
+  // cable glands + loom running into the chassis (orange HV + red/blue signal)
+  const glandXs = [0.02, 0.03, 0.04];
+  const cableSpecs = [
+    { color: 0xff7a1a, r: 0.0038, end: new THREE.Vector3(0.02, -0.03, 0.14), sag: -0.028 },
+    { color: 0xff5555, r: 0.002, end: new THREE.Vector3(-0.012, -0.02, 0.15), sag: -0.034 },
+    { color: 0x4f8cff, r: 0.002, end: new THREE.Vector3(-0.03, -0.01, 0.145), sag: -0.03 },
+  ];
+  cableSpecs.forEach((c, i) => {
+    const gland = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.0048, 0.01, 8), metal(0x0d1219, 0.6, 0.5));
+    gland.rotation.x = Math.PI / 2;
+    gland.position.set(glandXs[i] - 0.03, -0.004, 0.017);
+    g.add(gland);
+    const curve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(glandXs[i] - 0.03, -0.004, 0.02),
+      new THREE.Vector3(glandXs[i] - 0.03, c.sag, 0.07),
+      c.end,
+    ]);
+    const tube = new THREE.Mesh(
+      new THREE.TubeGeometry(curve, 20, c.r, 7),
+      new THREE.MeshStandardMaterial({ color: c.color, metalness: 0.15, roughness: 0.55 })
+    );
+    g.add(tube);
   });
 
   // antenna

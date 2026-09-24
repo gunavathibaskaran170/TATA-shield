@@ -1,19 +1,23 @@
 /* ============================================================
    SHIELD — Application shell + router
-   Left nav · header · page lifecycle
+   Slim premium header · compact nav rail · page lifecycle
    ============================================================ */
 
 import { createTwinPage } from './pages/twin.js';
 import { createHardwareTwinPage } from './pages/hardwareTwin.js';
+import { createAnatomyPage } from './pages/anatomy.js';
+import { createWheelPage } from './pages/wheelPoster.js';
 import { createPlaceholderPage } from './pages/placeholders.js';
 import { INSTALL_SUMMARY } from './config/sensors.js';
 
 const NAV = [
-  { id: 'twin', label: 'Twin', icon: '◆' },
-  { id: 'hardware', label: 'Hardware Twin', icon: '◈' },
+  { id: 'twin', label: 'Twin', icon: '◇' },
+  { id: 'hardware', label: 'Hardware Twin', icon: '⌑' },
+  { id: 'anatomy', label: 'Anatomy', icon: '⬡' },
+  { id: 'wheel', label: 'Wheel Assembly', icon: '◉' },
   { id: 'manufacturing', label: 'Manufacturing', icon: '⚙' },
   { id: 'experiments', label: 'Experiments', icon: '⌬' },
-  { id: 'analytics', label: 'Analytics', icon: '▥' },
+  { id: 'analytics', label: 'Analytics', icon: '▦' },
   { id: 'passport', label: 'Passport', icon: '▤' },
   { id: 'alerts', label: 'Alerts', icon: '⚠' },
 ];
@@ -21,11 +25,13 @@ const NAV = [
 const HEADERS = {
   twin: { kicker: 'SHIELD · STRUCTURAL DIGITAL TWIN', title: 'Structural Digital Twin' },
   hardware: { kicker: 'SHIELD · HARDWARE DIGITAL TWIN', title: 'Hardware Digital Twin' },
-  manufacturing: { kicker: 'SHIELD · MANUFACTURING', title: 'Manufacturing' },
-  experiments: { kicker: 'SHIELD · EXPERIMENTS', title: 'Experiments' },
-  analytics: { kicker: 'SHIELD · ANALYTICS', title: 'Analytics' },
-  passport: { kicker: 'SHIELD · ASSET PASSPORT', title: 'Asset Passport' },
-  alerts: { kicker: 'SHIELD · ALERTS', title: 'Alerts' },
+  anatomy: { kicker: 'SHIELD · EV CHASSIS 3D ANATOMY', title: 'EV Chassis 3D Anatomy' },
+  wheel: { kicker: 'SHIELD · EV CHASSIS WHEEL ASSEMBLY', title: 'EV Chassis Wheel Assembly' },
+  manufacturing: { kicker: 'SHIELD · MANUFACTURING', title: 'Smart Manufacturing Line' },
+  experiments: { kicker: 'SHIELD · EXPERIMENTS', title: 'Structural Experiments' },
+  analytics: { kicker: 'SHIELD · ANALYTICS', title: 'Signal Analytics' },
+  passport: { kicker: 'SHIELD · ASSET PASSPORT', title: 'Structural Digital Passport' },
+  alerts: { kicker: 'SHIELD · ALERTS', title: 'Operational Alerts' },
 };
 
 export function initApp() {
@@ -39,7 +45,9 @@ export function initApp() {
       <div class="nav-sec">WORKSPACE</div>
       <div id="nav-items"></div>
       <div class="nav-foot">
-        PROTOTYPE DEMO · EV-CH-007<br>Instrumented build 1:4<br><span style="color:var(--text-faint)">edge: ESP32 · WiFi/MQTT</span>
+        ASSET <span class="up">EV-CH-007</span> · 1:4 INSTRUMENTED BUILD<br>
+        REGIONS B1–B4 · F1 · C1 · R1<br>
+        edge: ESP32 · WiFi/MQTT
       </div>
     </nav>
     <main id="main">
@@ -49,10 +57,12 @@ export function initApp() {
           <h1 id="h-title"></h1>
         </div>
         <div class="h-chips">
-          <div class="chip"><b class="mono">EV-CH-007</b>&nbsp;·&nbsp;<span>Instrumented Model 1:4</span></div>
+          <div class="chip"><span class="dot idle" style="background:#7e8ca3"></span><span>Asset</span><b class="mono">EV-CH-007</b></div>
           <div class="chip"><span>Vehicle Mode</span><b>Manufacturing</b></div>
-          <div class="chip"><span class="dot ok pulse"></span><span>Edge Node</span><b>Connected</b></div>
-          <div class="chip"><span class="dot ${INSTALL_SUMMARY.healthy === INSTALL_SUMMARY.installed ? 'ok' : 'warn'}"></span><span>Sensors</span><b>${INSTALL_SUMMARY.healthy}/${INSTALL_SUMMARY.installed} Healthy</b></div>
+          <div class="chip"><span class="dot accent pulse"></span><span>Edge Node</span><b>Connected</b></div>
+          <div class="chip"><span class="dot warn"></span><span>Sensors</span><b>${INSTALL_SUMMARY.healthy}/${INSTALL_SUMMARY.installed} Healthy</b></div>
+          <div class="hdr-icon" title="Settings">⚙</div>
+          <div class="hdr-icon" title="Help">?</div>
         </div>
       </header>
       <div id="content"></div>
@@ -104,6 +114,14 @@ export function initApp() {
         queueMicrotask(() => page.selectSensor && page.selectSensor(pendingHardwareSelect));
       }
       pendingHardwareSelect = null;
+    } else if (id === 'anatomy') {
+      const page = createAnatomyPage(contentEl);
+      page.classList.add('active');
+      pages.anatomy = page;
+    } else if (id === 'wheel') {
+      const page = createWheelPage(contentEl);
+      page.classList.add('active');
+      pages.wheel = page;
     } else {
       const page = createPlaceholderPage(contentEl, id);
       page.classList.add('active');

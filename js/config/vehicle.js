@@ -59,5 +59,5 @@ export const ANCHOR = {
   rearMountZ: -0.175,
   frontCrossZ: 0.18,
   rearCrossZ: -0.18,
-  edgeNodePos: [0.245, 0.045, 0.0],
+  edgeNodePos: [0.24, 0.045, -0.16],   // external controller enclosure, rear-right
 };
