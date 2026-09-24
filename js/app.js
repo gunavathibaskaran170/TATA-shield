@@ -1,4 +1,4 @@
-/* ============================================================
+﻿/* ============================================================
    SHIELD — Application shell + router
    Slim premium header · compact nav rail · page lifecycle
    ============================================================ */
@@ -9,6 +9,7 @@ import { createAnatomyPage } from './pages/anatomy.js';
 import { createSensorLabPage } from './pages/sensorLab.js';
 import { createPlaceholderPage } from './pages/placeholders.js';
 import { INSTALL_SUMMARY } from './config/sensors.js';
+import { ASSET } from './config/assetConfig.js';
 
 const NAV = [
   { id: 'twin', label: 'Twin', icon: '◇' },
@@ -34,6 +35,15 @@ const HEADERS = {
   alerts: { kicker: 'SHIELD · ALERTS', title: 'Operational Alerts' },
 };
 
+const LINK_STATE = {
+  SIMULATED: { label: 'SIMULATED EDGE', class: 'idle', dotColor: '#7e8ca3' },
+  CONNECTING: { label: 'CONNECTING', class: 'warn', dotColor: '#f2b94e' },
+  CONNECTED: { label: 'CONNECTED', class: 'ok', dotColor: '#4fe0a0' },
+  RECONNECTING: { label: 'RECONNECTING', class: 'warn', dotColor: '#f2b94e' },
+  DISCONNECTED: { label: 'DISCONNECTED', class: 'off', dotColor: '#6b7686' },
+  ERROR: { label: 'ERROR', class: 'bad', dotColor: '#ff6b5e' },
+};
+
 export function initApp() {
   const app = document.getElementById('app');
   app.innerHTML = `
@@ -45,7 +55,7 @@ export function initApp() {
       <div class="nav-sec">WORKSPACE</div>
       <div id="nav-items"></div>
       <div class="nav-foot">
-        ASSET <span class="up">EV-CH-007</span> · 1:4 INSTRUMENTED BUILD<br>
+        ASSET <span class="up">EV-CH-007</span> · Scaled test frame · 400 × 200 mm<br>
         REGIONS B1–B4 · F1 · C1 · R1<br>
         edge: ESP32 · WiFi/MQTT
       </div>
@@ -59,8 +69,9 @@ export function initApp() {
         <div class="h-chips">
           <div class="chip"><span class="dot idle" style="background:#7e8ca3"></span><span>Asset</span><b class="mono">EV-CH-007</b></div>
           <div class="chip"><span>Vehicle Mode</span><b>Manufacturing</b></div>
-          <div class="chip"><span class="dot accent pulse"></span><span>Edge Node</span><b>Connected</b></div>
-          <div class="chip"><span class="dot warn"></span><span>Sensors</span><b>${INSTALL_SUMMARY.healthy}/${INSTALL_SUMMARY.installed} Healthy</b></div>
+          <div class="chip" id="hdr-mode-chip"><span class="dot idle" id="hdr-mode-dot"></span><span>MODE</span><b id="hdr-mode-label">SIMULATION</b></div>
+          <div class="chip" id="hdr-link-chip"><span class="dot idle" id="hdr-link-dot"></span><span>LINK</span><b id="hdr-link-label">SIMULATED EDGE</b></div>
+          <div class="chip" id="hdr-health-chip"><span class="dot ok" id="hdr-health-dot"></span><span>Sensors</span><b id="hdr-health-label">8/8 Healthy</b></div>
           <div class="hdr-icon" title="Settings">⚙</div>
           <div class="hdr-icon" title="Help">?</div>
         </div>
@@ -77,11 +88,44 @@ export function initApp() {
   let current = null;
   let pendingHardwareSelect = null;
 
+  const hdrModeLabel = app.querySelector('#hdr-mode-label');
+  const hdrModeDot = app.querySelector('#hdr-mode-dot');
+  const hdrLinkLabel = app.querySelector('#hdr-link-label');
+  const hdrLinkDot = app.querySelector('#hdr-link-dot');
+  const hdrHealthLabel = app.querySelector('#hdr-health-label');
+  const hdrHealthDot = app.querySelector('#hdr-health-dot');
+
+  function setModeChip(mode) {
+    hdrModeLabel.textContent = mode;
+    if (mode === 'LIVE') {
+      hdrModeDot.className = 'dot accent pulse';
+    } else {
+      hdrModeDot.className = 'dot idle';
+    }
+  }
+
+  function setLinkChip(state) {
+    const s = LINK_STATE[state] || LINK_STATE.DISCONNECTED;
+    hdrLinkLabel.textContent = s.label;
+    hdrLinkDot.className = 'dot ' + s.class;
+    hdrLinkDot.style.background = s.dotColor;
+  }
+
+  function setHealthChip(healthy, total) {
+    hdrHealthLabel.textContent = healthy + '/' + total + ' Healthy';
+    const cls = healthy === total ? 'ok' : healthy > 0 ? 'warn' : 'bad';
+    hdrHealthDot.className = 'dot ' + cls;
+  }
+
+  setModeChip('SIMULATION');
+  setLinkChip('SIMULATED');
+  setHealthChip(8, 8);
+
   NAV.forEach(item => {
     const b = document.createElement('button');
     b.className = 'nav-item';
     b.dataset.page = item.id;
-    b.innerHTML = `<span class="ic">${item.icon}</span><span>${item.label}</span>`;
+    b.innerHTML = '<span class="ic">' + item.icon + '</span><span>' + item.label + '</span>';
     b.addEventListener('click', () => go(item.id));
     navEl.appendChild(b);
   });
@@ -133,10 +177,12 @@ export function initApp() {
 
   go('twin');
 
-  // allow cross-link "open hardware twin sensor"
   window.SHIELD = {
     goto: go,
-    INSTALL_SUMMARY,
+    INSTALL_SUMMARY: { healthy: 8, installed: 8 },
+    setModeChip,
+    setLinkChip,
+    setHealthChip,
   };
   return { go };
 }
