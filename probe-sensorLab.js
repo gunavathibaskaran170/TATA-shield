@@ -26,7 +26,7 @@ const ok = (cond, msg) => { if (cond) { pass++; console.log('  ✓ ' + msg); } e
   await page.waitForSelector('canvas', { timeout: 20000 });
   await sleep(1200);
 
-  await page.evaluate(() => window.SHIELD.goto('sensors'));
+  await page.evaluate(() => window.SHIELD.goto('legacy/sensors'));
   await page.waitForFunction(() => !!window.__SL, { timeout: 20000 });
   await sleep(2400);
 
@@ -238,7 +238,14 @@ const ok = (cond, msg) => { if (cond) { pass++; console.log('  ✓ ' + msg); } e
   /* ---- nav order ---- */
   ok(p.nav[0].includes('Twin') && p.nav[1].includes('Hardware Twin'), 'nav twin order preserved');
   const sensorIdx = p.nav.findIndex(n => /Sensor Lab/.test(n));
-  ok(sensorIdx > 1, `Sensor Lab in nav at index ${sensorIdx}`);
+  ok(sensorIdx === -1, 'Sensor Lab removed from main nav (moved to legacy)');
+
+  /* ---- legacy route accessible ---- */
+  await page.evaluate(() => window.SHIELD.goto('legacy/sensors'));
+  await page.waitForFunction(() => !!window.__SL, { timeout: 20000 });
+  await sleep(1200);
+  p = await page.evaluate(() => window.__SL.probe());
+  ok(p.sensor === 'SG01' && p.modelLoaded, 'legacy/sensors route works');
 
   /* ---- no runtime errors ---- */
   ok(errors.length === 0, 'zero page errors' + (errors.length ? ' → ' + errors[0] : ''));

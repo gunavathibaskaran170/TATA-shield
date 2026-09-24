@@ -14,8 +14,6 @@ import { ASSET } from './config/assetConfig.js';
 const NAV = [
   { id: 'twin', label: 'Twin', icon: '◇' },
   { id: 'hardware', label: 'Hardware Twin', icon: '⌑' },
-  { id: 'anatomy', label: 'Anatomy', icon: '⬡' },
-  { id: 'sensors', label: 'Sensor Lab', icon: '⌗' },
   { id: 'manufacturing', label: 'Manufacturing', icon: '⚙' },
   { id: 'experiments', label: 'Experiments', icon: '⌬' },
   { id: 'analytics', label: 'Analytics', icon: '▦' },
@@ -26,8 +24,6 @@ const NAV = [
 const HEADERS = {
   twin: { kicker: 'SHIELD · STRUCTURAL DIGITAL TWIN', title: 'Structural Digital Twin' },
   hardware: { kicker: 'SHIELD · HARDWARE DIGITAL TWIN', title: 'Hardware Digital Twin' },
-  anatomy: { kicker: 'SHIELD · EV CHASSIS 3D ANATOMY', title: 'EV Chassis 3D Anatomy' },
-  sensors: { kicker: 'SHIELD · SENSOR LAB', title: 'Sensor Engineering Lab' },
   manufacturing: { kicker: 'SHIELD · MANUFACTURING', title: 'Smart Manufacturing Line' },
   experiments: { kicker: 'SHIELD · EXPERIMENTS', title: 'Structural Experiments' },
   analytics: { kicker: 'SHIELD · ANALYTICS', title: 'Signal Analytics' },
@@ -131,26 +127,33 @@ export function initApp() {
   });
 
   function go(id, payload) {
-    if (id === current) {
-      if (id === 'hardware' && payload && pages.hardware) pages.hardware.selectSensor && pages.hardware.selectSensor(payload);
+    // Handle legacy routes: /legacy/sensors -> sensors, /legacy/anatomy -> anatomy
+    let targetId = id;
+    let isLegacy = false;
+    if (id.startsWith('legacy/')) {
+      targetId = id.replace('legacy/', '');
+      isLegacy = true;
+    }
+    if (targetId === current) {
+      if (targetId === 'hardware' && payload && pages.hardware) pages.hardware.selectSensor && pages.hardware.selectSensor(payload);
       return;
     }
-    current = id;
+    current = targetId;
     navEl.querySelectorAll('.nav-item').forEach(x =>
-      x.classList.toggle('active', x.dataset.page === id));
+      x.classList.toggle('active', x.dataset.page === targetId && !isLegacy));
     contentEl.innerHTML = '';
-    pages[id] = null;
-    const h = HEADERS[id];
+    pages[targetId] = null;
+    const h = HEADERS[targetId] || { kicker: 'SHIELD · LEGACY', title: targetId.toUpperCase() };
     hKicker.textContent = h.kicker;
     hTitle.textContent = h.title;
 
-    pendingHardwareSelect = id === 'hardware' ? payload : null;
+    pendingHardwareSelect = targetId === 'hardware' ? payload : null;
 
-    if (id === 'twin') {
+    if (targetId === 'twin') {
       const page = createTwinPage(contentEl, go);
       page.classList.add('active');
       pages.twin = page;
-    } else if (id === 'hardware') {
+    } else if (targetId === 'hardware') {
       const page = createHardwareTwinPage(contentEl);
       page.classList.add('active');
       pages.hardware = page;
@@ -158,18 +161,18 @@ export function initApp() {
         queueMicrotask(() => page.selectSensor && page.selectSensor(pendingHardwareSelect));
       }
       pendingHardwareSelect = null;
-    } else if (id === 'anatomy') {
-      const page = createAnatomyPage(contentEl);
-      page.classList.add('active');
-      pages.anatomy = page;
-    } else if (id === 'sensors') {
+    } else if (targetId === 'sensors') {
       const page = createSensorLabPage(contentEl);
       page.classList.add('active');
       pages.sensors = page;
-    } else {
-      const page = createPlaceholderPage(contentEl, id);
+    } else if (targetId === 'anatomy') {
+      const page = createAnatomyPage(contentEl);
       page.classList.add('active');
-      pages[id] = page;
+      pages.anatomy = page;
+    } else {
+      const page = createPlaceholderPage(contentEl, targetId);
+      page.classList.add('active');
+      pages[targetId] = page;
     }
   }
 
