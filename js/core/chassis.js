@@ -17,6 +17,7 @@ const STRUCT      = () => new THREE.MeshStandardMaterial({ color: 0x9fb2c8, meta
 const STRUCT_DARK = () => new THREE.MeshStandardMaterial({ color: 0x2e3744, metalness: 0.8, roughness: 0.46 });
 const RAIL_DARK   = () => new THREE.MeshStandardMaterial({ color: 0x232b36, metalness: 0.85, roughness: 0.42 });
 const CRASH_PANEL = () => new THREE.MeshStandardMaterial({ color: 0x7c8ea8, metalness: 0.92, roughness: 0.26 });
+const SHELL_EDGE  = () => new THREE.MeshStandardMaterial({ color: 0x6e7f96, metalness: 0.9, roughness: 0.34 });
 
 const BATTERY_BODY = () => new THREE.MeshPhysicalMaterial({
   color: 0x13202c, metalness: 0.6, roughness: 0.24,
@@ -34,6 +35,12 @@ const HUB         = () => new THREE.MeshStandardMaterial({ color: 0x9fb2c8, meta
 const BRAKE       = () => new THREE.MeshStandardMaterial({ color: 0x4d5a6e, metalness: 0.9, roughness: 0.32 });
 const SPRING      = () => new THREE.MeshStandardMaterial({ color: 0xf2b94e, metalness: 0.55, roughness: 0.32 });
 const HV_CABLE    = () => new THREE.MeshStandardMaterial({ color: 0xff7a1a, metalness: 0.15, roughness: 0.55 });
+const FRAME_DARK  = () => new THREE.MeshStandardMaterial({ color: 0x2e3744, metalness: 0.8, roughness: 0.46 });
+const PC_CLEAR    = () => new THREE.MeshPhysicalMaterial({
+  color: 0xbfe9f4, metalness: 0, roughness: 0.08,
+  transparent: true, opacity: 0.16, side: THREE.DoubleSide,
+  clearcoat: 1.0, clearcoatRoughness: 0.06, envMapIntensity: 1.2,
+});
 
 function mesh(geo, mat, x = 0, y = 0, z = 0) {
   const m = new THREE.Mesh(geo, mat);
@@ -155,15 +162,28 @@ export function buildChassis(scene) {
     return regionGroups[id];
   }
 
+  /* ============================================================
+     MONOCOQUE-STYLE SHELL (matches "EV Chassis 3D Model" poster)
+     Low aluminium tub: structural floor + full-length side sills
+     (chassis shell), front/rear bulkheads, nose/tail bumper beams,
+     an upper frame over the battery bay, and a transparent PC
+     battery enclosure with visible modules + BMS.  The longitudinal
+     rails at ±railX stay the suspension mounting line (wishbone
+     pivots + coil-over towers ride on the flange top).
+     ============================================================ */
+
   /* --- Central floor plate (400 x 200 mm shell) --- */
-  const floor = box(regionGroup('C1'), 0.2, 0.008, 0.4, 0, 0.004, 0, STRUCT(), 'C1', 'floor');
+  const floor = box(regionGroup('C1'), 0.2, 0.006, 0.4, 0, 0.004, 0, STRUCT(), 'C1', 'floor');
   edges(regionGroup('C1'), floor, 0x35445c, 0.55);
   // floor panel stiffening ribs (visible from below / X-ray)
-  for (const rz of [-0.12, 0, 0.12]) {
-    box(regionGroup('C1'), 0.19, 0.004, 0.012, 0, -0.002, rz, STRUCT_DARK(), 'C1', 'floor-rib');
+  for (const rz of [-0.15, -0.09, 0, 0.09, 0.15]) {
+    box(regionGroup('C1'), 0.188, 0.004, 0.011, 0, 0.001, rz, STRUCT_DARK(), 'C1', 'floor-rib');
   }
 
-  /* --- Longitudinal rails (left / right) — box rails with caps --- */
+  /* --- Longitudinal rails (left / right) — suspension mounting
+         rails with top flange at railTopY (wishbone pivots + coil-
+         over towers seat here).  The rails are the outer sill line
+         the monocoque shell closes around. --- */
   const railLen = 0.47;
   function rail(side, z0) {
     const g = regionGroup(side === -1 ? 'B1' : 'B2');
@@ -177,7 +197,22 @@ export function buildChassis(scene) {
   rail(-1, 0);
   rail(1, 0);
 
-  /* --- Cross-members --- */
+  /* --- Monocoque side sills (chassis shell walls) inside the rails:
+         full-length aluminium tub walls + edge caps.  Stays below the
+         rail flange so suspension hardware above the rail stays clear. --- */
+  for (const side of [-1, 1]) {
+    const g = regionGroup(side === -1 ? 'B1' : 'B2');
+    const x = side * 0.088;
+    const wall = box(g, 0.006, 0.034, 0.42, x, 0.025, 0, STRUCT(), side === -1 ? 'B1' : 'B2', 'shell-wall');
+    edges(g, wall, 0x35445c, 0.55);
+    box(g, 0.006, 0.004, 0.42, x, 0.0435, 0, SHELL_EDGE(), side === -1 ? 'B1' : 'B2', 'shell-cap');
+    // sill brackets tying the wall to the rail base
+    for (const zz of [-0.2, -0.1, 0, 0.1, 0.2]) {
+      box(g, 0.008, 0.008, 0.01, x, 0.011, zz, RAIL_DARK(), side === -1 ? 'B1' : 'B2', 'sill-bracket');
+    }
+  }
+
+  /* --- Cross-members (lower frame lattice) --- */
   const cmC = 0.21;
   function crossMember(z, regionId) {
     const g = regionGroup(regionId);
@@ -185,19 +220,36 @@ export function buildChassis(scene) {
     edges(g, m, 0x35445c, 0.55);
     box(g, cmC, 0.014, 0.008, 0, 0.014, z, STRUCT_DARK(), regionId, 'cross-gusset');
   }
-  crossMember(A.frontCrossZ, 'F1');
+  crossMember(A.frontCrossZ, 'F1');   // front cross member (aluminium)
   crossMember(0.0, 'C1');
   crossMember(A.rearCrossZ, 'B3');
+  // under-battery mid braces close the lower frame
+  for (const zz of [-0.09, 0.09]) {
+    const g = regionGroup('C1');
+    const brace = box(g, 0.2, 0.018, 0.01, 0, 0.02, zz, STRUCT_DARK(), 'C1', 'mid-brace');
+    edges(g, brace, 0x35445c, 0.5);
+  }
 
-  /* --- Front / rear structural zones (bulkheads + crash cans) --- */
+  /* --- Monocoque nose / tail: bulkhead cross-walls + deck panels
+         + bumper beams with crush pods (front crash structure). --- */
   function endZone(dir, regionId) {
     const g = regionGroup(regionId);
     const z = dir * 0.245;
-    const bulk = box(g, 0.2, 0.08, 0.014, 0, 0.04, z - dir * 0.004, RAIL_DARK(), regionId, 'bulkhead');
+    // bulkhead cross-wall closing the tub
+    const bulk = box(g, 0.176, 0.048, 0.009, 0, 0.033, dir * 0.198, RAIL_DARK(), regionId, 'bulkhead');
     edges(g, bulk, 0x3d4d68, 0.5);
-    for (const sx of [-1, 1]) {
-      const can = box(g, 0.052, 0.048, 0.052, sx * 0.115, 0.024, z + dir * 0.026, CRASH_PANEL(), regionId, 'crash-can');
-      edges(g, can, 0x4a5a76, 0.55);
+    // deck / bonnet panel over the end bay
+    const deck = box(g, 0.17, 0.005, 0.05, 0, 0.052, dir * 0.232, STRUCT(), regionId, 'deck');
+    edges(g, deck, 0x35445c, 0.55);
+    // bumper beam across the nose / tail
+    const bumper = box(g, 0.19, 0.036, 0.016, 0, 0.035, dir * 0.268, CRASH_PANEL(), regionId, 'bumper');
+    edges(g, bumper, 0x4a5a76, 0.55);
+    // crush pods between bulkhead and bumper
+    for (const sx of [-1, 1]) for (const py of [0.024, 0.05]) {
+      const pod = mesh(new THREE.CylinderGeometry(0.0065, 0.0065, 0.026, 12), CRASH_PANEL(), sx * 0.062, py, dir * 0.252);
+      pod.rotation.x = Math.PI / 2;
+      pod.userData.regionId = regionId;
+      g.add(pod);
     }
   }
   endZone(1, 'F1');
@@ -215,37 +267,76 @@ export function buildChassis(scene) {
     }
   }
 
-  /* --- Battery pack: transparent PC cover over a 3 x 5 module grid --- */
+  /* --- Battery pack: transparent PC enclosure over a 3 x 5 module
+         grid — translucent walls + clear cover lid + visible cells,
+         BMS board and HV bus (matches "Battery enclosure (Transparent
+         PC)" layer of the exploded view). --- */
   const batW = 0.164, batL = 0.33;
-  const bat = box(regionGroup('C1'), batW, 0.042, batL, 0, 0.008, (A.batteryFrontZ + A.batteryRearZ) / 2, BATTERY_BODY(), 'C1', 'battery-housing');
+  const batZ = (A.batteryFrontZ + A.batteryRearZ) / 2;
+  const bat = box(regionGroup('C1'), batW, 0.04, batL, 0, 0.028, batZ, BATTERY_BODY(), 'C1', 'battery-housing');
   edges(regionGroup('C1'), bat, 0x3d5a88, 0.65);
+
+  // aluminium bezel rim around the cover mouth
+  const bezel = box(regionGroup('C1'), batW + 0.008, 0.008, batL + 0.008, 0, 0.052, batZ, SHELL_EDGE(), 'C1', 'battery-bezel');
+  edges(regionGroup('C1'), bezel, 0x3d5a88, 0.6);
+  // clear PC lid sheet (high-clearcoat, low opacity)
+  const lid = mesh(new THREE.BoxGeometry(batW - 0.004, 0.004, batL - 0.004), PC_CLEAR(), 0, 0.056, batZ);
+  lid.userData.regionId = 'C1';
+  regionGroup('C1').add(lid);
 
   const cellMat = MODULE();
   const topMat = MODULE_TOP();
   const busMat = BUS_BAR();
   const grid = regionGroup('C1');
-  // prismatic modules: 3 across (x) x 5 along (z), each with a silver terminal top
+  // prismatic modules: 3 across (x) x 5 along (z) — seated on the
+  // housing floor (y 0.008), silver terminal caps on top, HV spine
+  // + row bus bars above the caps, all inside the transparent shell
   const colX = [-0.053, 0, 0.053];
   const rowZ = [-0.148, -0.086, -0.024, 0.038, 0.1];
   for (const mx of colX) for (const mz of rowZ) {
-    const mod = mesh(new THREE.BoxGeometry(0.048, 0.03, 0.058), cellMat, mx, 0.004, mz);
+    const mod = mesh(new THREE.BoxGeometry(0.048, 0.03, 0.058), cellMat, mx, 0.024, mz);
     mod.userData.regionId = 'C1';
     grid.add(mod);
-    const cap = mesh(new THREE.BoxGeometry(0.044, 0.003, 0.054), topMat, mx, 0.0205, mz);
+    const cap = mesh(new THREE.BoxGeometry(0.044, 0.003, 0.054), topMat, mx, 0.0405, mz);
     cap.userData.regionId = 'C1';
     grid.add(cap);
   }
   // orange HV spine bus bar + per-row links
-  const spine = mesh(new THREE.BoxGeometry(0.006, 0.003, 0.3), busMat, 0, 0.0245, -0.024);
+  const spine = mesh(new THREE.BoxGeometry(0.006, 0.003, 0.3), busMat, 0, 0.044, -0.024);
   grid.add(spine);
   for (const mz of rowZ) {
-    grid.add(mesh(new THREE.BoxGeometry(0.11, 0.0025, 0.005), busMat, 0, 0.0245, mz));
+    grid.add(mesh(new THREE.BoxGeometry(0.11, 0.0025, 0.005), busMat, 0, 0.044, mz));
   }
-  // HV cable: pack front -> front bay along the right rail, then a drop to the pack
+
+  /* --- BMS board (cells + BMS) + HV connector at the pack rear --- */
+  const bmsMat = new THREE.MeshStandardMaterial({ color: 0x1c5c33, metalness: 0.12, roughness: 0.6 });
+  const chipMat = new THREE.MeshStandardMaterial({ color: 0x11151c, metalness: 0.4, roughness: 0.6 });
+  for (const sx of [-1, 1]) {
+    grid.add(mesh(new THREE.CylinderGeometry(0.002, 0.002, 0.008, 8), STRUCT_DARK(), sx * 0.03, 0.041, -0.15));
+  }
+  const bms = mesh(new THREE.BoxGeometry(0.09, 0.004, 0.05), bmsMat, 0, 0.0445, -0.15);
+  bms.userData.regionId = 'C1';
+  grid.add(bms);
+  const bmsChip = mesh(new THREE.BoxGeometry(0.024, 0.004, 0.024), chipMat, -0.018, 0.046, -0.15);
+  bmsChip.userData.regionId = 'C1';
+  grid.add(bmsChip);
+  const bmsTerm = mesh(new THREE.BoxGeometry(0.02, 0.004, 0.01), BUS_BAR(), 0.025, 0.0455, -0.145);
+  bmsTerm.userData.regionId = 'C1';
+  grid.add(bmsTerm);
+  // HV outlet block on the pack rear wall
+  const hvOut = mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.009, 14), BUS_BAR(), 0, 0.03, A.batteryRearZ + 0.008);
+  hvOut.rotation.x = Math.PI / 2;
+  hvOut.userData.regionId = 'C1';
+  grid.add(hvOut);
+
+  // HV cable: pack front -> up over the front bulkhead -> power bay
+  // (routes through a bulkhead grommet line, then drops beside the
+  //  right upper frame rail to the front bay)
   const hvCurve = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(0.05, 0.026, 0.14),
-    new THREE.Vector3(0.075, 0.036, 0.18),
-    new THREE.Vector3(0.085, 0.03, 0.235),
+    new THREE.Vector3(0.05, 0.03, 0.14),
+    new THREE.Vector3(0.078, 0.062, 0.185),
+    new THREE.Vector3(0.082, 0.05, 0.21),
+    new THREE.Vector3(0.084, 0.03, 0.24),
   ]);
   const hv = mesh(new THREE.TubeGeometry(hvCurve, 24, 0.004, 8), HV_CABLE());
   hv.userData.regionId = 'C1';
@@ -257,11 +348,26 @@ export function buildChassis(scene) {
   regionGroup('C1').add(epF);
   const epR = mesh(new THREE.BoxGeometry(batW + 0.008, 0.048, 0.007), endMat, 0, 0.009, A.batteryRearZ);
   regionGroup('C1').add(epR);
-  // cover flange corner bolts (lid fasteners)
-  const batCz = (A.batteryFrontZ + A.batteryRearZ) / 2;
+  // cover flange corner bolts (lid fasteners on the bezel)
+  const batCz = batZ;
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-    const flBolt = mesh(new THREE.CylinderGeometry(0.0035, 0.0035, 0.006, 8), BOLT(), sx * 0.074, 0.031, batCz + sz * 0.152);
+    const flBolt = mesh(new THREE.CylinderGeometry(0.0035, 0.0035, 0.007, 8), BOLT(), sx * 0.078, 0.056, batCz + sz * 0.156);
     regionGroup('C1').add(flBolt);
+  }
+
+  /* --- Upper frame / shell: perimeter rails over the battery bay
+         (the top "upper frame / shell" layer of the exploded view).
+         Centre stays open so the transparent pack reads through. --- */
+  for (const side of [-1, 1]) {
+    const g = regionGroup('C1');
+    const x = side * 0.062;
+    const ur = box(g, 0.012, 0.02, 0.4, x, 0.068, 0, FRAME_DARK(), 'C1', 'upper-rail');
+    edges(g, ur, 0x35445c, 0.55);
+  }
+  for (const zz of [0.185, -0.185]) {
+    const g = regionGroup('C1');
+    const uh = box(g, 0.148, 0.02, 0.012, 0, 0.068, zz, FRAME_DARK(), 'C1', 'upper-head');
+    edges(g, uh, 0x35445c, 0.55);
   }
 
   /* --- Battery mounting points (brackets + bolts) --- */
@@ -293,6 +399,9 @@ export function buildChassis(scene) {
   const stage = buildStage();
   stage.name = 'stage';
   root.add(stage);
+
+  /* QA hook: keep last built chassis reachable from headless probes */
+  if (typeof window !== 'undefined') window.__LAST_CHASSIS__ = { group: root, regionGroups };
 
   return { group: root, regionGroups };
 }

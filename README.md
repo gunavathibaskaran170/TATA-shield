@@ -1,8 +1,8 @@
 # SHIELD — EV Structural & Hardware Digital Twin
 
-Four interactive digital-twin pages for the **EV-CH-007** prototype skateboard
-chassis, built with procedural Three.js (r160), ES modules and a zero-build
-Node static server.
+Four interactive digital-twin pages for the **EV-CH-007** prototype
+monocoque-style EV chassis, built with procedural Three.js (r160), ES modules
+and a zero-build Node static server.
 
 | Page | What it does |
 | --- | --- |
@@ -149,6 +149,7 @@ maps, KPIs and the verdict.
 | `node check-labels.js` | Label legibility proof: every sensor label projects on-canvas with readable glyph pixels |
 | `node probe-anatomy.js` | Anatomy poster probe: panel sizes, callout leaders, layer/zone labels, legend clipping |
 | `node probe-wheel.js` | Wheel poster probe: 9 callouts/leaders, exploded chips inside panel, measurements fit, dims, nav order |
+| `node probe-chassis.js` | Chassis geometry probe: monocoque parts present/sized/positioned, rail + wheel anchors unchanged, region groups intact (20 assertions) |
 
 Requires the server running on :8123, a local Chrome at
 `C:\Program Files\Google\Chrome\Application\chrome.exe` (edit `CHROME` in each
@@ -170,7 +171,7 @@ js/config/vehicle.js    EV-CH-007 chassis anchors + regions
 js/config/sensors.js    sensor layout (config-driven)
 js/core/scene.js        renderer, camera, OrbitControls, flyTo, frame hooks, study lights
 js/core/multiView.js    shared offscreen renderer for poster panels
-js/core/chassis.js      procedural skateboard chassis + region meshes + dimensions/axis
+js/core/chassis.js      procedural monocoque chassis (floor + side sills + bulkheads + bumper beams + upper frame + transparent battery enclosure) + region meshes + dimensions/axis
 js/core/sensorMeshes.js sensor + Edge Node mesh builders
 js/core/signalPaths.js  logical signal lines + animated digital-mapping pulses
 js/core/labels.js       canvas sprite labels
