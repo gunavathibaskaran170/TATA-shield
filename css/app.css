@@ -702,52 +702,7 @@ body::before {
   background: var(--accent); box-shadow: 0 0 6px rgba(56,217,207,0.8);
 }
 
-/* ============================================================
-   EV CHASSIS WHEEL ASSEMBLY � poster page
-   ============================================================ */
-.wheel {
-  position: absolute; inset: 0; overflow: hidden;
-  background: radial-gradient(1300px 760px at 55% 12%, #0b1322, var(--bg) 75%);
-}
-.wa-grid {
-  position: absolute; inset: 0; padding: 10px;
-  display: grid; gap: 10px;
-  grid-template-columns: minmax(0, 620px) repeat(3, minmax(0, 1fr));
-  grid-template-rows: minmax(0, 600px) minmax(0, 1fr);
-}
-.wa-hero {
-  grid-column: 1; grid-row: 1; position: relative; overflow: hidden;
-  border: 1px solid var(--line); border-radius: 12px;
-  background: var(--panel);
-}
-.wa-hero canvas { display: block; }
-.wa-front { grid-column: 2; grid-row: 1; }
-.wa-side  { grid-column: 3; grid-row: 1; }
-.wa-rear  { grid-column: 4; grid-row: 1; }
-.wa-bp    { grid-column: 1; grid-row: 2; }
-.wa-ex    { grid-column: 2 / span 2; grid-row: 2; }
-.wa-km    { grid-column: 4; grid-row: 2; }
-
-/* stacked two-line callout (component name + role) */
-.co.co2 { flex-direction: column; align-items: flex-start; gap: 1px; }
-.co.co2 b { line-height: 1.2; }
-.co.co2 i { line-height: 1.2; }
-
-/* blueprint pair */
-.bp-pair { position: relative; flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; }
-.bp-pair > .bp { position: relative; min-width: 0; }
-.bp-pair > .bp + .bp { border-left: 1px dashed rgba(90,210,255,0.22); }
-.bp-pair canvas { display: block; position: absolute; inset: 0; width: 100%; height: 100%; }
-.bp-cap {
-  position: absolute; left: 0; right: 0; bottom: 7px; text-align: center;
-  font-size: 9px; letter-spacing: 2.4px; font-weight: 700;
-  color: #5ad2ff; text-shadow: 0 0 10px rgba(90,210,255,0.4);
-}
-.pd-v.right { left: auto; right: 26px; }
-.pd-v.right .t { left: auto; right: 7px; }
-.pd-v.right::before, .pd-v.right::after { left: auto; right: -4px; }
-
-/* dim label sub-line (value on line 1, name below) */
+/* shared dimension-arrow labels (Anatomy poster) */
 .pd-h .t i, .pd-v .t i {
   display: block; font-style: normal; font-size: 8px; letter-spacing: 0.3px;
   color: var(--text-dim); font-family: var(--font); font-weight: 500;
@@ -756,33 +711,6 @@ body::before {
 .pd-h.has-sub { bottom: 30px; }
 .pd-h.at-top { top: 16px; bottom: auto; }
 .pd-h.at-mid { bottom: 38%; }
-
-/* exploded-view component chips */
-.wxl {
-  position: absolute; transform: translateX(-50%); width: max-content;
-  display: flex; gap: 7px; align-items: flex-start;
-  padding: 5px 8px; border: 1px solid var(--line-strong); border-radius: 6px;
-  background: rgba(6,10,16,0.92);
-}
-.wxl .d { width: 7px; height: 7px; border-radius: 50%; margin-top: 3px; flex: 0 0 auto; }
-.wxl b { display: block; font-size: 9.5px; color: var(--text); font-weight: 600; letter-spacing: 0.3px; line-height: 1.25; }
-.wxl i { display: block; font-style: normal; font-size: 8.5px; color: var(--text-faint); }
-
-/* key measurements table */
-.km { list-style: none; padding: 7px 12px; display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
-.km li {
-  display: flex; align-items: baseline; gap: 8px;
-  font-size: 10px; line-height: 1.45;
-}
-.km b { color: var(--text-dim); font-weight: 500; white-space: nowrap; }
-.km s {
-  flex: 1; text-decoration: none; border-bottom: 1px dotted rgba(140,160,190,0.35);
-  transform: translateY(-3px); min-width: 8px;
-}
-.km i {
-  font-style: normal; color: var(--text); font-family: var(--mono);
-  font-weight: 600; font-size: 10px; white-space: nowrap;
-}
 
 /* ============================================================
    SHIELD � Sensor Lab (engineering inspection viewer)

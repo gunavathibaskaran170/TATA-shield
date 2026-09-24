@@ -128,15 +128,6 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   await sleep(500);
   await shot('41-anatomy-redraw');
 
-  /* ============ EV CHASSIS WHEEL ASSEMBLY ============ */
-  await page.evaluate(() => window.SHIELD.goto('wheel'));
-  await page.waitForFunction(() => !!window.__WH, { timeout: 20000 });
-  await sleep(2600);
-  await shot('50-wheel-poster');
-  await page.evaluate(() => window.__WH.redraw());
-  await sleep(500);
-  await shot('51-wheel-redraw');
-
   /* ============ SENSOR LAB ============ */
   await page.evaluate(() => window.SHIELD.goto('sensors'));
   await page.waitForFunction(() => !!window.__SL, { timeout: 20000 });

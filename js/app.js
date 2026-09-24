@@ -6,7 +6,6 @@
 import { createTwinPage } from './pages/twin.js';
 import { createHardwareTwinPage } from './pages/hardwareTwin.js';
 import { createAnatomyPage } from './pages/anatomy.js';
-import { createWheelPage } from './pages/wheelPoster.js';
 import { createSensorLabPage } from './pages/sensorLab.js';
 import { createPlaceholderPage } from './pages/placeholders.js';
 import { INSTALL_SUMMARY } from './config/sensors.js';
@@ -15,7 +14,6 @@ const NAV = [
   { id: 'twin', label: 'Twin', icon: '◇' },
   { id: 'hardware', label: 'Hardware Twin', icon: '⌑' },
   { id: 'anatomy', label: 'Anatomy', icon: '⬡' },
-  { id: 'wheel', label: 'Wheel Assembly', icon: '◉' },
   { id: 'sensors', label: 'Sensor Lab', icon: '⌗' },
   { id: 'manufacturing', label: 'Manufacturing', icon: '⚙' },
   { id: 'experiments', label: 'Experiments', icon: '⌬' },
@@ -28,7 +26,6 @@ const HEADERS = {
   twin: { kicker: 'SHIELD · STRUCTURAL DIGITAL TWIN', title: 'Structural Digital Twin' },
   hardware: { kicker: 'SHIELD · HARDWARE DIGITAL TWIN', title: 'Hardware Digital Twin' },
   anatomy: { kicker: 'SHIELD · EV CHASSIS 3D ANATOMY', title: 'EV Chassis 3D Anatomy' },
-  wheel: { kicker: 'SHIELD · EV CHASSIS WHEEL ASSEMBLY', title: 'EV Chassis Wheel Assembly' },
   sensors: { kicker: 'SHIELD · SENSOR LAB', title: 'Sensor Engineering Lab' },
   manufacturing: { kicker: 'SHIELD · MANUFACTURING', title: 'Smart Manufacturing Line' },
   experiments: { kicker: 'SHIELD · EXPERIMENTS', title: 'Structural Experiments' },
@@ -121,10 +118,6 @@ export function initApp() {
       const page = createAnatomyPage(contentEl);
       page.classList.add('active');
       pages.anatomy = page;
-    } else if (id === 'wheel') {
-      const page = createWheelPage(contentEl);
-      page.classList.add('active');
-      pages.wheel = page;
     } else if (id === 'sensors') {
       const page = createSensorLabPage(contentEl);
       page.classList.add('active');
