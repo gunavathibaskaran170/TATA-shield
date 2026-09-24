@@ -189,6 +189,8 @@ export function createTwinPage(host, nav) {
       <div class="brow scen-row">
         <span class="scen-label">SCENARIO</span>
         <div id="tw-scenarios" style="display:flex;gap:6px;overflow:hidden"></div>
+        <button class="btn small" id="tw-zoom-in" title="Zoom In">➕</button>
+        <button class="btn small" id="tw-zoom-out" title="Zoom Out">➖</button>
         <button class="btn small" id="tw-reset" style="margin-left:auto">Reset View</button>
         <button class="btn small" id="tw-to-hw">Hardware Twin →</button>
       </div>
@@ -883,6 +885,14 @@ export function createTwinPage(host, nav) {
     renderDecision();
   }
 
+  page.querySelector('#tw-zoom-in').addEventListener('click', () => {
+    V.controls.dollyIn(1.3);
+    V.controls.update();
+  });
+  page.querySelector('#tw-zoom-out').addEventListener('click', () => {
+    V.controls.dollyOut(1.3);
+    V.controls.update();
+  });
   page.querySelector('#tw-reset').addEventListener('click', () => {
     V.flyTo(V.defaults.homePos.clone(), V.defaults.homeTarget.clone(), 0.7);
   });
