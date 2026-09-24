@@ -10,6 +10,7 @@ and a zero-build Node static server.
 | **Hardware Twin** | The instrumentation architecture on the same chassis: strain gauges, IMUs, load cell, temperature, optional displacement sensor and the SHIELD Edge Node, with signal-path / digital-mapping / exploded views and a per-sensor inspector. |
 | **Anatomy** | Live engineering poster: hero 3/4 chassis with sensor callouts, 400/200 mm dimension arrows and XYZ gizmo, animated exploded chassis-layers stack, top/front/side/rear orthographic views, sensor-placement zones with glowing hot-spots, and material/sensor legends. |
 | **Wheel Assembly** | Detailed wheel-corner poster: hero 3/4 tyre·rim·disc·caliper·hub·suspension with 9 component callouts, front/side/rear views with dimension arrows, wireframe orthographic blueprint, animated exploded view with part chips, key-measurements table. |
+| **Sensor Lab** | Dedicated engineering-inspection viewer for the SG01 foil strain gauge and IMU01 6-DOF IMU: switchable interactive 3D models (parts, mounting, cable), camera presets, smooth exploded/assembled slider, internal X-ray, anatomy callouts, part picking with component info, simulated telemetry, SHOW STRAIN foil demo with heat overlay, SHOW AXES pitch/roll/yaw demo and SHOW-ON-CHASSIS mounting context. |
 
 Both pages render the **same EV-CH-007 chassis** from one shared config, so
 structural regions (B1–B4 battery mounts, F1 front, C1 centre, R1 rear) and
@@ -117,7 +118,8 @@ maps, KPIs and the verdict.
 
 - **Header**: SHIELD · Hardware Digital Twin / Structural Twin · **EV-CH-007** ·
   Manufacturing · Edge Node Connected · **7/8 Healthy**.
-- **Left nav**: Twin · Hardware Twin · Anatomy · Wheel Assembly · Manufacturing ·
+- **Left nav**: Twin · Hardware Twin · Anatomy · Wheel Assembly · Sensor Lab ·
+  Manufacturing ·
   Experiments · Analytics · Passport · Alerts — *Twin* and *Hardware Twin* are
   clearly distinct pages; *Anatomy* adds the full-chassis poster view and
   *Wheel Assembly* the detailed corner-assembly poster.
@@ -136,19 +138,20 @@ maps, KPIs and the verdict.
 | 6 | Inspector LIVE DATA / COMPONENT INFO; SG02 OFFLINE, 7/8, no zone fail | `verify.js` (SG02 excluded, zone not failed) + UI |
 | 7 | Header + left nav; Twin vs Hardware Twin distinct | `app.js` router; `verify.js` nav assertions |
 | 8 | Config-driven layout, disclaimer, compact signal-chain strip | `js/config/*` + bottom chain; verified in `verify.js` |
-| 9 | Renders at 1920×1080, no console errors | `render.js` (33 shots in `shots/`, incl. Anatomy poster 40/41 and Wheel poster 50/51) — all frames `vehicle-ok`, zero browser errors |
+| 9 | Renders at 1920×1080, no console errors | `render.js` (67 shots in `shots/`, incl. Anatomy poster 40/41, Wheel poster 50/51 and Sensor Lab 60–67) — all frames `vehicle-ok`, zero browser errors |
 
 ## QA scripts
 
 | Script | Purpose |
 | --- | --- |
-| `node render.js` | Headless Chrome at 1920×1080 → `shots/` (33 screenshots: twin views + scenarios, HW inspector + filters + toggles, anatomy poster, wheel poster) |
+| `node render.js` | Headless Chrome at 1920×1080 → `shots/` (67 screenshots: twin views + scenarios, HW inspector + filters + toggles, anatomy poster, wheel poster, sensor lab views) |
 | `node analyze.js` | Pixel-metric review of every shot (vehicle density, inspector/strip occupancy) |
 | `node verify.js` | 36 DOM/runtime assertions (summary, inspector, filters, twin modes, SG02 health, scenarios) |
 | `node check-mechanics.js` | Runtime-mechanics proof: digital-mapping pulse animation, exploded opacity/scale/camera |
 | `node check-labels.js` | Label legibility proof: every sensor label projects on-canvas with readable glyph pixels |
 | `node probe-anatomy.js` | Anatomy poster probe: panel sizes, callout leaders, layer/zone labels, legend clipping |
 | `node probe-wheel.js` | Wheel poster probe: 9 callouts/leaders, exploded chips inside panel, measurements fit, dims, nav order |
+| `node probe-sensorLab.js` | Sensor Lab probe: SG01/IMU01 models + parts, explode/internal/anatomy, strain + axes demos, selection, chassis mount, switcher, nav, zero page errors |
 | `node probe-chassis.js` | Chassis geometry probe: monocoque parts present/sized/positioned, rail + wheel anchors unchanged, region groups intact (20 assertions) |
 
 Requires the server running on :8123, a local Chrome at
@@ -165,6 +168,7 @@ js/pages/twin.js        Structural Twin
 js/pages/hardwareTwin.js  Hardware Twin
 js/pages/anatomy.js      EV Chassis 3D Anatomy poster (hero + static views)
 js/pages/wheelPoster.js  EV Chassis Wheel Assembly poster (hero + blueprint + exploded)
+js/pages/sensorLab.js    Sensor detail viewer (SG01 strain gauge / IMU01 IMU inspect)
 js/core/wheelAssembly.js detailed corner assembly (tyre, rim, disc, caliper, hub, suspension)
 js/pages/placeholders.js  Manufacturing / Experiments / Analytics / Passport / Alerts
 js/config/vehicle.js    EV-CH-007 chassis anchors + regions
@@ -175,6 +179,10 @@ js/core/chassis.js      procedural monocoque chassis (floor + side sills + bulkh
 js/core/sensorMeshes.js sensor + Edge Node mesh builders
 js/core/signalPaths.js  logical signal lines + animated digital-mapping pulses
 js/core/labels.js       canvas sprite labels
-vendor/                 three.module.js, OrbitControls (local copies)
+js/config/sensorDetail.js  SG01/IMU01 part trees, mm dims, explode offsets, specs, telemetry, mounts
+js/core/detail/shared.js   part primitives (bolt M6, M12 cable/gland, foil, PCB, decals, triads)
+js/core/detail/sg01.js      SG01 strain-gauge assembly builder
+js/core/detail/imu01.js     IMU01 IMU assembly builder
+vendor/                 three.module.js, OrbitControls, RoundedBoxGeometry, GLTFLoader (local copies)
 server.js               static server (Node built-in http, port 8123)
 ```"# TATA-shield" 

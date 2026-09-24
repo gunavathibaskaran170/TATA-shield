@@ -137,6 +137,40 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   await sleep(500);
   await shot('51-wheel-redraw');
 
+  /* ============ SENSOR LAB ============ */
+  await page.evaluate(() => window.SHIELD.goto('sensors'));
+  await page.waitForFunction(() => !!window.__SL, { timeout: 20000 });
+  await sleep(2400);
+  await shot('60-sl-sg01');
+
+  await page.evaluate(() => window.__SL.setExplode(1));
+  await sleep(1600);
+  await shot('61-sl-sg01-exploded');
+
+  await page.evaluate(() => { window.__SL.setExplode(0); window.__SL.setInternal(true); });
+  await sleep(1400);
+  await shot('62-sl-sg01-internal');
+
+  await page.evaluate(() => { window.__SL.setInternal(false); window.__SL.setStrain(true); window.__SL.setLoad(0.85); });
+  await sleep(1500);
+  await shot('63-sl-sg01-strain');
+
+  await page.evaluate(() => { window.__SL.setStrain(false); window.__SL.setLoad(0.55); window.__SL.select('IMU01'); });
+  await sleep(2000);
+  await shot('64-sl-imu01');
+
+  await page.evaluate(() => { window.__SL.setAxes(true); window.__SL.setRotation('YAW'); });
+  await sleep(1700);
+  await shot('65-sl-imu01-yaw');
+
+  await page.evaluate(() => { window.__SL.setAxes(false); window.__SL.setExplode(1); window.__SL.setAnatomy(true); });
+  await sleep(1900);
+  await shot('66-sl-imu01-exploded-anatomy');
+
+  await page.evaluate(() => { window.__SL.setExplode(0); window.__SL.setAnatomy(false); window.__SL.setChassis(true); });
+  await sleep(1900);
+  await shot('67-sl-sg01-chassis');
+
   console.log('\nBrowser errors:');
   if (errors.length === 0) console.log('  ✓ none');
   else errors.slice(0, 20).forEach(e => console.log('  ✗ ' + e));
