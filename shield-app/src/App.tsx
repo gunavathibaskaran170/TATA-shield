@@ -21,20 +21,37 @@ import { Investigations } from './pages/Investigations';
 import { StructuralPassport } from './pages/StructuralPassport';
 import { Reports } from './pages/Reports';
 import { Settings } from './pages/Settings';
+import { HardwareLive } from './pages/HardwareLive';
 
 import { ErrorBoundary } from './ui/ErrorBoundary';
 
+import { DigitalEngineering } from './pages/DigitalEngineering';
+import { ManufacturingQuality } from './pages/ManufacturingQuality';
+import { ControlledValidation } from './pages/ControlledValidation';
+import { RoadCorrelation } from './pages/RoadCorrelation';
+import { LiveDigitalTwin } from './pages/LiveDigitalTwin';
+import { EngineeringAnalytics } from './pages/EngineeringAnalytics';
+import { EngineeringWorkbench } from './pages/EngineeringWorkbench';
+
 const PAGES: Record<PageKey, ComponentType> = {
   command: CommandCenter,
+  workbench: EngineeringWorkbench,
+  digital_eng: DigitalEngineering,
+  mfg_quality: ManufacturingQuality,
+  controlled_val: ControlledValidation,
+  road_corr: RoadCorrelation,
+  live_twin: LiveDigitalTwin,
+  eng_analytics: EngineeringAnalytics,
+  passport: StructuralPassport,
   twin: VehicleTwin,
   intelligence: StructuralIntelligence,
   manufacturing: ManufacturingThread,
   telemetry: LiveTelemetry,
+  hardware: HardwareLive,
   fleet: FleetAnalytics,
   forensics: EventForensics,
   diagnostics: AIDiagnostics,
   investigations: Investigations,
-  passport: StructuralPassport,
   reports: Reports,
   settings: Settings,
 };

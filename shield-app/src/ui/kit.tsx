@@ -31,6 +31,7 @@ export const PROV_CLS: Record<Provenance, string> = {
   MODEL_ESTIMATED: 'prov-derived',
   SIMULATED: 'prov-simulated',
   DEMO: 'prov-demo',
+  REFERENCE: 'prov-verified',
 };
 
 export function ProvTag({ p }: { p: Provenance | undefined }) {

@@ -10,6 +10,7 @@ export type Provenance =
   | 'MODEL_ESTIMATED' // engineering model estimate (simulation/derived)
   | 'SIMULATED'       // synthetic feed (mock generator)
   | 'DEMO'            // placeholder used for presentation only
+  | 'REFERENCE'       // precomputed CAD/CAE benchmark baseline
   | 'VERIFIED';       // confirmed against supplied authoritative source
 
 export type HealthState = 'NORMAL' | 'WATCH' | 'INSPECTION_REQUIRED';
@@ -277,19 +278,140 @@ export interface RegionState {
 }
 
 /* ------------------------------------------------------------
+   Engineering Lifecycle & Validation Types
+   ------------------------------------------------------------ */
+export type LifecycleStage =
+  | 'DESIGN'
+  | 'CAE'
+  | 'BUILD'
+  | 'QUALITY'
+  | 'COMMISSION'
+  | 'VALIDATION'
+  | 'ROAD'
+  | 'FIELD';
+
+export type DesignRevision = 'REV-A' | 'REV-B' | 'REV-C';
+
+export type CaeLoadCase =
+  | 'bending'
+  | 'torsion'
+  | 'suspension_mount'
+  | 'battery_mount'
+  | 'wheel_input'
+  | 'braking_transfer'
+  | 'cornering_lateral'
+  | 'pothole_impact'
+  | 'kerb_strike'
+  | 'underbody_intrusion'
+  | 'battery_enclosure'
+  | 'modal_excitation';
+
+export type TestRigType =
+  | 'four_post'
+  | 'torsion'
+  | 'bending'
+  | 'modal'
+  | 'battery_mount';
+
+export type RoadSectorId =
+  | 'PG-01'
+  | 'PG-02'
+  | 'PG-03'
+  | 'PG-04'
+  | 'PG-05'
+  | 'PG-06'
+  | 'PG-07'
+  | 'PG-08'
+  | 'PG-09'
+  | 'PG-10';
+
+export interface MetrologyDatumPoint {
+  id: string;
+  name: string;
+  nominal: [number, number, number];
+  measured: [number, number, number];
+  deviationMm: number;
+  toleranceMm: number;
+  status: 'ACCEPT' | 'REWORK' | 'REJECT';
+  region: string;
+}
+
+export type DataSourceClassification =
+  | 'MEASURED'
+  | 'CALCULATED'
+  | 'ESTIMATED'
+  | 'REFERENCE'
+  | 'DEMO';
+
+/* ------------------------------------------------------------
+   Manual Engineering Workbench Types
+   ------------------------------------------------------------ */
+export type ManualLoadType =
+  | 'vertical'
+  | 'longitudinal'
+  | 'lateral'
+  | 'torsional'
+  | 'point'
+  | 'distributed'
+  | 'cyclic';
+
+export type ManualLoadState = 'IDLE' | 'APPLYING' | 'HOLDING' | 'RELEASING';
+
+export type ManualTestPhase = 'BEFORE' | 'DURING' | 'AFTER';
+
+export interface ManualLoadPointDef {
+  id: string;
+  label: string;
+  componentId: string;
+  region: string;
+  pos: [number, number, number];
+  nominalDir: [number, number, number];
+  maxForceN: number;
+  kStiffnessNPerMm: number;
+}
+
+export interface EngineeringTestRun {
+  id: string;
+  timestamp: string;
+  title: string;
+  componentId: string;
+  loadType: ManualLoadType;
+  loadN: number;
+  dir: [number, number, number];
+  tempC: number;
+  strainBefore: number;
+  strainPeak: number;
+  strainAfter: number;
+  calculatedStressMpa: number;
+  displacementMm: number;
+  residualMicrostrain: number;
+  outcome: HealthState;
+  engineerDecision: 'CONFIRM' | 'OVERRIDE' | 'RETEST_REQUIRED' | 'INCONCLUSIVE';
+  reviewNote?: string;
+}
+
+/* ------------------------------------------------------------
    App routing
    ------------------------------------------------------------ */
 export type PageKey =
   | 'command'
+  | 'workbench'
+  | 'digital_eng'
+  | 'mfg_quality'
+  | 'controlled_val'
+  | 'road_corr'
+  | 'live_twin'
+  | 'eng_analytics'
+  | 'passport'
   | 'twin'
   | 'intelligence'
   | 'manufacturing'
   | 'telemetry'
+  | 'hardware'
   | 'fleet'
   | 'forensics'
   | 'diagnostics'
   | 'investigations'
-  | 'passport'
   | 'reports'
   | 'settings';
 

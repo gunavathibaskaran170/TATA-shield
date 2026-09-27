@@ -115,29 +115,27 @@ function TwinToolbar() {
   return (
     <div className="panel" style={{ padding: '6px 10px', display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
       {/* mode switcher */}
-      <div className="row" style={{ gap: 4, background: 'var(--bg2)', padding: '2px 4px', borderRadius: 6, border: '1px solid var(--line2)' }}>
-        <button
-          className={viewMode === 'skeletal' ? 'btn active' : 'btn'}
-          style={{
-            padding: '4px 12px', fontSize: 11, fontWeight: 700, borderRadius: 4,
-            background: viewMode === 'skeletal' ? '#123a40' : 'transparent',
-            color: viewMode === 'skeletal' ? 'var(--cyan)' : 'var(--text)'
-          }}
-          onClick={() => setViewMode('skeletal')}
-        >
-          🦴 Skeletal View
-        </button>
-        <button
-          className={viewMode === 'complete' ? 'btn active' : 'btn'}
-          style={{
-            padding: '4px 12px', fontSize: 11, fontWeight: 700, borderRadius: 4,
-            background: viewMode === 'complete' ? '#123a40' : 'transparent',
-            color: viewMode === 'complete' ? 'var(--cyan)' : 'var(--text)'
-          }}
-          onClick={() => setViewMode('complete')}
-        >
-          🚘 Complete Car
-        </button>
+      <div className="row" style={{ gap: 4, background: 'var(--bg2)', padding: '2px 4px', borderRadius: 6, border: '1px solid var(--line2)', flexWrap: 'wrap' }}>
+        {[
+          { key: 'complete' as const, label: '🚘 Complete Car' },
+          { key: 'transparent' as const, label: '💎 Transparent Body' },
+          { key: 'chassis' as const, label: '🏎️ Chassis Only' },
+          { key: 'exploded' as const, label: '💥 Exploded Assembly' },
+          { key: 'skeletal' as const, label: '🦴 Skeletal View' },
+        ].map((m) => (
+          <button
+            key={m.key}
+            className={viewMode === m.key ? 'btn active' : 'btn'}
+            style={{
+              padding: '4px 10px', fontSize: 11, fontWeight: 700, borderRadius: 4,
+              background: viewMode === m.key ? '#123a40' : 'transparent',
+              color: viewMode === m.key ? 'var(--cyan)' : 'var(--text)'
+            }}
+            onClick={() => setViewMode(m.key)}
+          >
+            {m.label}
+          </button>
+        ))}
       </div>
 
       {/* camera */}

@@ -1,7 +1,22 @@
 import { create } from 'zustand';
-import type { FastenerDef, PageKey, RegionState, SensorLive } from '../schema/types';
+import type {
+  FastenerDef,
+  PageKey,
+  RegionState,
+  SensorLive,
+  CaeLoadCase,
+  DesignRevision,
+  LifecycleStage,
+  RoadSectorId,
+  TestRigType,
+  ManualLoadType,
+  ManualLoadState,
+  ManualTestPhase,
+  EngineeringTestRun,
+} from '../schema/types';
 import { CATALOG, CATALOG_BY_ID, relatedIds, descendantsOf } from '../data/catalog';
 import { TIMELINE_DURATION, EVENTS, phaseAt } from '../data/scenarios';
+import { INITIAL_TEST_RUNS } from '../data/engineering';
 
 export type ViewPreset = 'iso' | 'front' | 'rear' | 'left' | 'right' | 'top' | 'bottom';
 export type BatteryViewMode = 'closed' | 'cover_transparent' | 'open' | 'exploded' | 'module_view' | 'mount_view';
@@ -107,7 +122,7 @@ interface Store {
   applyBatteryMode: (m: BatteryViewMode) => void;
 
   /* ---------------- camera & mode ---------------- */
-  viewMode: 'skeletal' | 'complete';
+  viewMode: 'complete' | 'transparent' | 'chassis' | 'exploded' | 'skeletal';
   autoRotate: boolean;
   viewPreset: ViewPreset | null;
   focusRequest: { id: string; t: number } | null;
@@ -116,7 +131,7 @@ interface Store {
   zoomToken: number;
   zoomFactor: number;
   cadView: boolean;
-  setViewMode: (mode: 'skeletal' | 'complete') => void;
+  setViewMode: (mode: 'complete' | 'transparent' | 'chassis' | 'exploded' | 'skeletal') => void;
   setAutoRotate: (v: boolean) => void;
   setViewPreset: (p: ViewPreset) => void;
   focusOn: (id: string) => void;
@@ -163,6 +178,50 @@ interface Store {
   /* ---------------- component search ---------------- */
   search: string;
   setSearch: (s: string) => void;
+
+  /* ---------------- engineering lifecycle & validation ---------------- */
+  currentRevision: DesignRevision;
+  setCurrentRevision: (r: DesignRevision) => void;
+  activeCaeLoadCase: CaeLoadCase;
+  setActiveCaeLoadCase: (c: CaeLoadCase) => void;
+  activeTestRig: TestRigType;
+  setActiveTestRig: (r: TestRigType) => void;
+  activeRoadSector: RoadSectorId;
+  setActiveRoadSector: (s: RoadSectorId) => void;
+  visualDeformationScale: number;
+  setVisualDeformationScale: (v: number) => void;
+  selectedDatumPoint: string | null;
+  setSelectedDatumPoint: (id: string | null) => void;
+  activeLifecycleStage: LifecycleStage;
+  setActiveLifecycleStage: (s: LifecycleStage) => void;
+
+  /* ---------------- manual engineering workbench ---------------- */
+  manualSelectedLoadPointId: string | null;
+  setManualSelectedLoadPointId: (id: string | null) => void;
+  manualAppliedForceN: number;
+  setManualAppliedForceN: (n: number) => void;
+  manualLoadType: ManualLoadType;
+  setManualLoadType: (t: ManualLoadType) => void;
+  manualLoadVector: [number, number, number];
+  setManualLoadVector: (v: [number, number, number]) => void;
+  manualLoadState: ManualLoadState;
+  setManualLoadState: (st: ManualLoadState) => void;
+  manualLoadDurationS: number;
+  setManualLoadDurationS: (d: number) => void;
+  manualLoadRamp: 'instant' | 'linear' | 'smooth';
+  setManualLoadRamp: (r: 'instant' | 'linear' | 'smooth') => void;
+  manualDeformationScale: number;
+  setManualDeformationScale: (s: number) => void;
+  manualTemperatureC: number;
+  setManualTemperatureC: (t: number) => void;
+  manualMaterialE: number;
+  setManualMaterialE: (e: number) => void;
+  manualTestPhase: ManualTestPhase;
+  setManualTestPhase: (p: ManualTestPhase) => void;
+  manualRecordedRuns: EngineeringTestRun[];
+  saveManualTestRun: (run: EngineeringTestRun) => void;
+  resetManualInputs: () => void;
+  returnToBaseline: () => void;
 }
 
 const DEFAULT_OPACITY = 1;
@@ -355,14 +414,15 @@ export const useStore = create<Store>((set, get) => ({
   },
 
   /* ---------------- camera & mode ---------------- */
-  viewMode: 'skeletal',
+  viewMode: 'complete',
   autoRotate: false,
   setViewMode: (mode) => {
-    const isComplete = mode === 'complete';
+    const isSkeletal = mode === 'skeletal';
+    const isExploded = mode === 'exploded';
     set({
       viewMode: mode,
-      cadView: !isComplete,
-      explode: 0,
+      cadView: isSkeletal,
+      explode: isExploded ? 0.45 : 0,
       viewPreset: 'iso',
       selected: [],
       activeFastener: null,
@@ -429,6 +489,65 @@ export const useStore = create<Store>((set, get) => ({
   /* ---------------- component search ---------------- */
   search: '',
   setSearch: (s) => set({ search: s }),
+
+  /* ---------------- engineering lifecycle & validation ---------------- */
+  currentRevision: 'REV-B',
+  setCurrentRevision: (r) => set({ currentRevision: r }),
+  activeCaeLoadCase: 'torsion',
+  setActiveCaeLoadCase: (c) => set({ activeCaeLoadCase: c }),
+  activeTestRig: 'four_post',
+  setActiveTestRig: (r) => set({ activeTestRig: r }),
+  activeRoadSector: 'PG-04',
+  setActiveRoadSector: (s) => set({ activeRoadSector: s }),
+  visualDeformationScale: 1,
+  setVisualDeformationScale: (v) => set({ visualDeformationScale: v }),
+  selectedDatumPoint: null,
+  setSelectedDatumPoint: (id) => set({ selectedDatumPoint: id }),
+  activeLifecycleStage: 'ROAD',
+  setActiveLifecycleStage: (s) => set({ activeLifecycleStage: s }),
+
+  /* ---------------- manual engineering workbench ---------------- */
+  manualSelectedLoadPointId: 'LP-FRONT-RAIL-L',
+  setManualSelectedLoadPointId: (id) => set({ manualSelectedLoadPointId: id }),
+  manualAppliedForceN: 15000,
+  setManualAppliedForceN: (n) => set({ manualAppliedForceN: n }),
+  manualLoadType: 'vertical',
+  setManualLoadType: (t) => set({ manualLoadType: t }),
+  manualLoadVector: [0, -1, 0],
+  setManualLoadVector: (v) => set({ manualLoadVector: v }),
+  manualLoadState: 'IDLE',
+  setManualLoadState: (st) => set({ manualLoadState: st }),
+  manualLoadDurationS: 5.0,
+  setManualLoadDurationS: (d) => set({ manualLoadDurationS: d }),
+  manualLoadRamp: 'smooth',
+  setManualLoadRamp: (r) => set({ manualLoadRamp: r }),
+  manualDeformationScale: 15,
+  setManualDeformationScale: (s) => set({ manualDeformationScale: s }),
+  manualTemperatureC: 28.0,
+  setManualTemperatureC: (t) => set({ manualTemperatureC: t }),
+  manualMaterialE: 210,
+  setManualMaterialE: (e) => set({ manualMaterialE: e }),
+  manualTestPhase: 'DURING',
+  setManualTestPhase: (p) => set({ manualTestPhase: p }),
+  manualRecordedRuns: INITIAL_TEST_RUNS,
+  saveManualTestRun: (run) => set((s) => ({ manualRecordedRuns: [run, ...s.manualRecordedRuns] })),
+  resetManualInputs: () =>
+    set({
+      manualAppliedForceN: 0,
+      manualLoadState: 'IDLE',
+      manualTestPhase: 'BEFORE',
+      manualDeformationScale: 1,
+      manualLoadVector: [0, -1, 0],
+    }),
+  returnToBaseline: () =>
+    set({
+      manualAppliedForceN: 0,
+      manualLoadState: 'IDLE',
+      manualTestPhase: 'BEFORE',
+      manualDeformationScale: 1,
+      manualTemperatureC: 25.0,
+      manualLoadVector: [0, -1, 0],
+    }),
 }));
 
 /* Convenience selectors used across the UI */

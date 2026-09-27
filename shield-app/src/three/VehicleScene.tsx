@@ -34,6 +34,7 @@ import { Sensors } from './systems/Sensors';
 import { ShieldInstrumentBox } from './systems/ShieldBox';
 import { EXPLODE, ExplodedOverlays } from './ExplodedView';
 import { ProductionSuv } from './systems/ProductionSuv';
+import { WorkbenchGizmos } from './systems/WorkbenchGizmos';
 
 /* ------------------------------------------------------------
    Camera presets (earth axes, +z forward) — demo camera moves.
@@ -538,6 +539,7 @@ export function VehicleScene() {
 
       {isSkeletal && (cadView && explode > 0.05 ? <ExplodedOverlays /> : <LoadPathArrows />)}
       {isSkeletal && <ClipGizmos />}
+      <WorkbenchGizmos />
       <CameraRig />
       <FitRig />
     </Canvas>

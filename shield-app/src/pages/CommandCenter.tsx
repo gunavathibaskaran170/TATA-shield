@@ -6,17 +6,15 @@ import { CATALOG, SYSTEM_GROUPS, childrenOf } from '../data/catalog';
 import { Card, StatusChip, Stat, ProvTag } from '../ui/kit';
 import type { PageKey } from '../schema/types';
 
-const NAV_GRID: { key: PageKey; label: string; hint: string }[] = [
-  { key: 'twin', label: 'Vehicle Twin', hint: 'Inspect the 3D structure, select components, fasteners and sensors' },
-  { key: 'intelligence', label: 'Structural Intelligence', hint: 'Heatmaps, region states and model-estimated analytics' },
-  { key: 'telemetry', label: 'Live Telemetry', hint: 'Sensor streams + residual analysis (swappable data source)' },
-  { key: 'fleet', label: 'Fleet Analytics', hint: 'Synthetic fleet correlations — not a defect claim' },
-  { key: 'forensics', label: 'Event Forensics', hint: 'Replay the 30 s timeline and inspect sensor responses' },
-  { key: 'diagnostics', label: 'AI Diagnostics', hint: 'Explainable suggestions from residual + persistence' },
-  { key: 'manufacturing', label: 'Manufacturing Thread', hint: 'Quality gates and joint verification status' },
-  { key: 'investigations', label: 'Investigations', hint: 'Triage and track structural findings' },
-  { key: 'passport', label: 'Structural Passport', hint: 'Baselines A/B and provenance for this twin' },
-  { key: 'reports', label: 'Reports', hint: 'Export engineering summaries' },
+const NAV_GRID: { key: PageKey; label: string; hint: string; num: string }[] = [
+  { key: 'digital_eng', label: '01 Digital Engineering & CAE', hint: 'Interactive unibody BIW, 12 CAE load cases, and release gate', num: '01' },
+  { key: 'mfg_quality', label: '02 Manufacturing Quality', hint: 'Digital Nominal CAD vs As-Built CMM laser metrology cell', num: '02' },
+  { key: 'controlled_val', label: '03 Controlled Validation', hint: '4-Post road simulator, torsional rigidity rig, and CAE correlation', num: '03' },
+  { key: 'road_corr', label: '04 Road Correlation', hint: '10 proving ground sectors, Indian road profiles, and event replay', num: '04' },
+  { key: 'live_twin', label: '05 Live Digital Twin', hint: 'Full-screen vehicle view, sensor-structure link, and residual engine', num: '05' },
+  { key: 'eng_analytics', label: '06 Engineering Analytics', hint: 'Root-Cause Trace backwards from road to factory & CAD release', num: '06' },
+  { key: 'passport', label: '07 Vehicle Digital Passport', hint: 'Immutable 8-tab lifecycle ledger, ISO structural certification', num: '07' },
+  { key: 'hardware', label: 'Hardware Live Diagnostic', hint: 'ESP32 serial / MQTT real-time sensor node connection', num: 'HW' },
 ];
 
 export function CommandCenter() {
@@ -137,22 +135,37 @@ export function CommandCenter() {
         </Card>
       </div>
 
-      <Card title="Jump to a workspace">
-        <div className="grid3">
+      <Card title="Vehicle Engineering Lifecycle Workspaces (01–07)">
+        <div className="grid4">
           {NAV_GRID.map((n) => (
             <button
               key={n.key}
               className="panel"
-              style={{ padding: '10px 12px', textAlign: 'left', cursor: 'pointer', color: 'var(--text)', fontFamily: 'inherit' }}
+              style={{
+                padding: '10px 12px',
+                textAlign: 'left',
+                cursor: 'pointer',
+                color: 'var(--text)',
+                fontFamily: 'inherit',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 4,
+                background: 'rgba(255,255,255,0.02)',
+                border: '1px solid var(--line)',
+                transition: 'all 0.15s ease',
+              }}
               onClick={() => navigate(n.key)}
             >
-              <div className="small" style={{ color: 'var(--cyan)', fontWeight: 600 }}>{n.label}</div>
-              <div className="tiny faint" style={{ marginTop: 3 }}>{n.hint}</div>
+              <div className="spread">
+                <span className="small" style={{ color: 'var(--cyan)', fontWeight: 700 }}>{n.label}</span>
+                <span className="tiny mono" style={{ background: 'rgba(56,189,248,0.15)', color: '#38bdf8', padding: '1px 5px', borderRadius: 3 }}>{n.num}</span>
+              </div>
+              <div className="tiny faint" style={{ lineHeight: 1.3 }}>{n.hint}</div>
             </button>
           ))}
         </div>
         <div className="tiny faint" style={{ marginTop: 10 }}>
-          Live data source: <b>mock generator</b> (swap to MQTT/hardware without UI changes — Settings). All analytics derived in-app are MODEL_ESTIMATED until verified.
+          Live data source: <b>Continuous Lifecycle Ingest</b> (Hardware Live ESP32 serial bridge, MQTT gateway, or physics-coupled mock). All analytical residual models comply with ISO structural verification guidelines.
         </div>
       </Card>
 

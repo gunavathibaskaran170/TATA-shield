@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SHIELD Baseline Record Schema v1.0",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "vehicle_id",
+    "baseline_stage",
+    "timestamp",
+    "operator_id",
+    "geometry_version",
+    "items",
+    "status"
+  ],
+  "properties": {
+    "schema_version": { "type": "string", "enum": ["1.0"] },
+    "vehicle_id": { "type": "string" },
+    "baseline_stage": { "type": "string", "enum": ["STAGE_1_FACTORY", "STAGE_2_CONTROLLED"] },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "operator_id": { "type": "string" },
+    "geometry_version": { "type": "string" },
+    "status": { "type": "string", "enum": ["PENDING", "PASSED", "FAILED", "BLOCKED"] },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["item_id", "name", "region_id", "method", "unit", "acceptance_min", "acceptance_max", "verified"],
+        "properties": {
+          "item_id": { "type": "string" },
+          "name": { "type": "string" },
+          "region_id": { "type": "string" },
+          "method": { "type": "string" },
+          "measured_value": { "type": ["number", "null"] },
+          "unit": { "type": "string" },
+          "acceptance_min": { "type": "number" },
+          "acceptance_max": { "type": "number" },
+          "verified": { "type": "boolean" },
+          "evidence_notes": { "type": "string" }
+        }
+      }
+    }
+  }
+}
