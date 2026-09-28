@@ -3,13 +3,14 @@ import * as THREE from 'three';
 import { useStore } from '../../store/useStore';
 import { Sel } from '../Sel';
 import { buildShellGeometry } from '../bodyShell';
+import { Cabin } from './Cabin';
 
 /* ============================================================
    SHIELD — Standalone Production EV SUV (Complete Car Mode).
    Dedicated closed-body consumer vehicle model.
    - Metallic graphite silver paint with automotive clear-coat
    - Continuous closed body shell (hood, fenders, doors, roof, tailgate, bumpers)
-   - Dark smoked automotive glass
+   - Dark smoked automotive glass with visible high-fidelity interior structure
    - Gloss black pillars, panoramic roof section, and roof rails
    - Machined 5-spoke alloy wheels with rubber tires
    - Modern EV continuous front LED bar and rear light strip
@@ -44,15 +45,15 @@ const UNIBODY_STEEL = {
   roughness: 0.25,
 };
 
-/* Smoked Dark Automotive Glass */
+/* Smoked Tinted Automotive Glass (Allows interior visibility) */
 const GLASS_SMOKED = {
-  color: '#0a0e14',
+  color: '#161e28',
   emissive: '#04070a',
-  emissiveIntensity: 0.1,
-  metalness: 0.92,
-  roughness: 0.06,
+  emissiveIntensity: 0.08,
+  metalness: 0.75,
+  roughness: 0.08,
   transparent: true,
-  opacity: 0.94,
+  opacity: 0.52,
   side: THREE.DoubleSide,
 };
 
@@ -149,27 +150,45 @@ function ProductionWheel({ position, side }: { position: [number, number, number
 function UnibodyFrame() {
   return (
     <group name="unibody-frame">
-      {/* Side Sills (Left & Right Longitudinal Extrusions) */}
+      {/* Side Sills (Left & Right Longitudinal Extrusions with Perforated Lightening Holes) */}
       {([-1, 1] as const).map((s) => (
         <Sel key={s} cid={s < 0 ? 'SideSills_L' : 'SideSills_R'}>
-          <mesh position={[s * 0.86, 0.38, 0]} castShadow receiveShadow>
-            <boxGeometry args={[0.14, 0.18, 3.42]} />
-            <meshStandardMaterial {...UNIBODY_STEEL} />
-          </mesh>
+          <group position={[s * 0.86, 0.38, 0]}>
+            <mesh castShadow receiveShadow>
+              <boxGeometry args={[0.14, 0.18, 3.42]} />
+              <meshStandardMaterial {...UNIBODY_STEEL} />
+            </mesh>
+            {/* Machined Perforated Lightening Holes along side sills */}
+            {[-1.4, -1.0, -0.6, -0.2, 0.2, 0.6, 1.0, 1.4].map((hz) => (
+              <mesh key={hz} position={[s * 0.071, 0, hz]} rotation={[0, Math.PI / 2, 0]}>
+                <cylinderGeometry args={[0.04, 0.04, 0.02, 16]} />
+                <meshStandardMaterial color="#1a202c" metalness={0.9} roughness={0.1} />
+              </mesh>
+            ))}
+          </group>
         </Sel>
       ))}
 
-      {/* Floor Crossmembers (Transverse Underfloor Tubes) */}
+      {/* Floor Crossmembers (Transverse Underfloor Load-Bearing Beams) */}
       {[-1.2, -0.4, 0.4, 1.2].map((z, idx) => (
         <Sel key={z} cid={`FloorCrossmember_${idx + 1}`}>
-          <mesh position={[0, 0.38, z]} castShadow receiveShadow>
-            <boxGeometry args={[1.62, 0.12, 0.12]} />
-            <meshStandardMaterial {...UNIBODY_STEEL} />
-          </mesh>
+          <group position={[0, 0.38, z]}>
+            <mesh castShadow receiveShadow>
+              <boxGeometry args={[1.62, 0.12, 0.12]} />
+              <meshStandardMaterial {...UNIBODY_STEEL} />
+            </mesh>
+            {/* Bolted Flange Brackets connecting to Side Sills */}
+            {([-1, 1] as const).map((s) => (
+              <mesh key={s} position={[s * 0.78, 0, 0]} castShadow>
+                <boxGeometry args={[0.06, 0.16, 0.16]} />
+                <meshStandardMaterial color="#4a5568" metalness={0.88} roughness={0.2} />
+              </mesh>
+            ))}
+          </group>
         </Sel>
       ))}
 
-      {/* Battery Enclosure & Pack */}
+      {/* Battery Enclosure & Pack (Segmented Cell Modules + HV Busbars) */}
       <Sel cid="BatteryEnclosure">
         {/* Main Tray */}
         <mesh position={[0, 0.32, -0.1]} castShadow receiveShadow>
@@ -181,6 +200,22 @@ function UnibodyFrame() {
           <boxGeometry args={[1.34, 0.02, 2.21]} />
           <meshStandardMaterial color="#68768a" metalness={0.85} roughness={0.2} />
         </mesh>
+        {/* Segmented Rectangular Battery Modules with Cell Matrix Lines */}
+        {[-0.8, -0.3, 0.3, 0.8].map((bz) =>
+          ([-0.35, 0.35] as const).map((bx) => (
+            <group key={`mod_${bz}_${bx}`} position={[bx, 0.428, bz - 0.1]}>
+              <mesh castShadow>
+                <boxGeometry args={[0.56, 0.03, 0.42]} />
+                <meshStandardMaterial color="#2d3748" metalness={0.9} roughness={0.2} />
+              </mesh>
+              {/* Module Top Busbar Terminals */}
+              <mesh position={[0, 0.018, 0]}>
+                <boxGeometry args={[0.48, 0.005, 0.08]} />
+                <meshStandardMaterial color="#ff6600" emissive="#ff4400" emissiveIntensity={0.8} />
+              </mesh>
+            </group>
+          ))
+        )}
         {/* Battery Mounting Brackets to Unibody Sills */}
         {[-0.9, 0, 0.9].map((bz) =>
           ([-1, 1] as const).map((s) => (
@@ -192,53 +227,111 @@ function UnibodyFrame() {
         )}
       </Sel>
 
-      {/* Front Subframe Cradle */}
+      {/* Front Subframe Cradle & Suspension Towers */}
       <Sel cid="FrontSubframe">
         <mesh position={[0, 0.36, 1.45]} castShadow receiveShadow>
           <boxGeometry args={[1.22, 0.14, 0.75]} />
           <meshStandardMaterial {...UNIBODY_STEEL} />
         </mesh>
-        {/* Front Suspension Strut Towers */}
+        {/* Perforated Front Crash Beams */}
         {([-1, 1] as const).map((s) => (
-          <mesh key={s} position={[s * 0.68, 0.62, 1.425]} castShadow>
-            <cylinderGeometry args={[0.1, 0.14, 0.48, 16]} />
-            <meshStandardMaterial {...UNIBODY_STEEL} />
-          </mesh>
+          <group key={s} position={[s * 0.52, 0.36, 1.82]}>
+            <mesh castShadow>
+              <boxGeometry args={[0.16, 0.14, 0.32]} />
+              <meshStandardMaterial {...UNIBODY_STEEL} />
+            </mesh>
+          </group>
+        ))}
+        {/* Front Suspension Strut Towers & Coil Springs */}
+        {([-1, 1] as const).map((s) => (
+          <group key={s} position={[s * 0.68, 0.62, 1.425]}>
+            <mesh castShadow>
+              <cylinderGeometry args={[0.11, 0.15, 0.48, 16]} />
+              <meshStandardMaterial {...UNIBODY_STEEL} />
+            </mesh>
+            {/* Coil Spring Overlay */}
+            {[ -0.16, -0.08, 0, 0.08, 0.16 ].map((cy) => (
+              <mesh key={cy} position={[0, cy, 0]}>
+                <torusGeometry args={[0.115, 0.015, 8, 20]} />
+                <meshStandardMaterial color="#1a202c" metalness={0.8} roughness={0.2} />
+              </mesh>
+            ))}
+          </group>
         ))}
       </Sel>
 
-      {/* Rear Subframe Cradle */}
+      {/* Rear Subframe Cradle & Suspension Towers */}
       <Sel cid="RearSubframe">
         <mesh position={[0, 0.36, -1.45]} castShadow receiveShadow>
           <boxGeometry args={[1.22, 0.14, 0.75]} />
           <meshStandardMaterial {...UNIBODY_STEEL} />
         </mesh>
-        {/* Rear Suspension Strut Towers */}
+        {/* Rear Suspension Strut Towers & Coil Springs */}
         {([-1, 1] as const).map((s) => (
-          <mesh key={s} position={[s * 0.68, 0.62, -1.425]} castShadow>
-            <cylinderGeometry args={[0.1, 0.14, 0.48, 16]} />
-            <meshStandardMaterial {...UNIBODY_STEEL} />
-          </mesh>
+          <group key={s} position={[s * 0.68, 0.62, -1.425]}>
+            <mesh castShadow>
+              <cylinderGeometry args={[0.11, 0.15, 0.48, 16]} />
+              <meshStandardMaterial {...UNIBODY_STEEL} />
+            </mesh>
+            {[ -0.16, -0.08, 0, 0.08, 0.16 ].map((cy) => (
+              <mesh key={cy} position={[0, cy, 0]}>
+                <torusGeometry args={[0.115, 0.015, 8, 20]} />
+                <meshStandardMaterial color="#1a202c" metalness={0.8} roughness={0.2} />
+              </mesh>
+            ))}
+          </group>
         ))}
       </Sel>
 
-      {/* Structural Sensor Nodes (FL, FR, MID_L, MID_R, RL, RR) */}
+      {/* Multi-Branch Orange High-Voltage & Sensor Cable Routing Harness */}
+      <group name="orange-load-paths">
+        {/* Longitudinal Sill Main Bus Harnesses */}
+        {([-1, 1] as const).map((s) => (
+          <group key={s}>
+            <mesh position={[s * 0.82, 0.49, 0]} rotation={[Math.PI / 2, 0, 0]}>
+              <cylinderGeometry args={[0.014, 0.014, 3.2, 8]} />
+              <meshStandardMaterial color="#ff6600" emissive="#ff4400" emissiveIntensity={1.6} />
+            </mesh>
+            {/* Front Strut Tower Routing Feeds */}
+            <mesh position={[s * 0.75, 0.58, 1.425]} rotation={[0.4, 0, s * -0.3]}>
+              <cylinderGeometry args={[0.012, 0.012, 0.45, 8]} />
+              <meshStandardMaterial color="#ff6600" emissive="#ff4400" emissiveIntensity={1.6} />
+            </mesh>
+            {/* Rear Strut Tower Routing Feeds */}
+            <mesh position={[s * 0.75, 0.58, -1.425]} rotation={[-0.4, 0, s * -0.3]}>
+              <cylinderGeometry args={[0.012, 0.012, 0.45, 8]} />
+              <meshStandardMaterial color="#ff6600" emissive="#ff4400" emissiveIntensity={1.6} />
+            </mesh>
+          </group>
+        ))}
+        {/* Transverse Cross-Member Telemetry Connections */}
+        {[-1.2, -0.4, 0.4, 1.2].map((z) => (
+          <mesh key={z} position={[0, 0.45, z]} rotation={[0, 0, Math.PI / 2]}>
+            <cylinderGeometry args={[0.01, 0.01, 1.6, 8]} />
+            <meshStandardMaterial color="#ff6600" emissive="#ff4400" emissiveIntensity={1.6} />
+          </mesh>
+        ))}
+      </group>
+
+      {/* Structural Telemetry Sensor Nodes (S01 to S08) */}
       {[
-        { id: 'S01', name: 'FL_Rail', pos: [-0.68, 0.48, 1.4] },
-        { id: 'S02', name: 'FR_Rail', pos: [0.68, 0.48, 1.4] },
-        { id: 'S03', name: 'MID_L_Sill', pos: [-0.86, 0.48, 0.1] },
-        { id: 'S04', name: 'MID_R_Sill', pos: [0.86, 0.48, 0.1] },
-        { id: 'S05', name: 'RL_Rail', pos: [-0.68, 0.48, -1.4] },
-        { id: 'S06', name: 'RR_Rail', pos: [0.68, 0.48, -1.4] },
+        { id: 'S01', name: 'FL_Rail', pos: [-0.68, 0.78, 1.425] },
+        { id: 'S02', name: 'FR_Rail', pos: [0.68, 0.78, 1.425] },
+        { id: 'S03', name: 'MID_L_Sill', pos: [-0.86, 0.49, 0.4] },
+        { id: 'S04', name: 'MID_R_Sill', pos: [0.86, 0.49, 0.4] },
+        { id: 'S05', name: 'BATT_MID_L', pos: [-0.86, 0.49, -0.4] },
+        { id: 'S06', name: 'BATT_MID_R', pos: [0.86, 0.49, -0.4] },
+        { id: 'S07', name: 'RL_Rail', pos: [-0.68, 0.78, -1.425] },
+        { id: 'S08', name: 'RR_Rail', pos: [0.68, 0.78, -1.425] },
       ].map((node) => (
         <group key={node.id} position={node.pos as [number, number, number]}>
           <mesh>
-            <sphereGeometry args={[0.045, 16, 16]} />
-            <meshStandardMaterial color="#00e5ff" emissive="#00a8ff" emissiveIntensity={1.2} />
+            <sphereGeometry args={[0.048, 16, 16]} />
+            <meshStandardMaterial color="#ff7700" emissive="#ff5500" emissiveIntensity={2.0} />
           </mesh>
           <mesh rotation={[Math.PI / 2, 0, 0]}>
-            <torusGeometry args={[0.07, 0.008, 8, 24]} />
-            <meshBasicMaterial color="#00e5ff" transparent opacity={0.65} />
+            <torusGeometry args={[0.08, 0.01, 8, 24]} />
+            <meshBasicMaterial color="#ff6600" transparent opacity={0.88} />
           </mesh>
         </group>
       ))}
@@ -250,10 +343,14 @@ function UnibodyFrame() {
 export function ProductionSuv() {
   const viewMode = useStore((s) => s.viewMode);
   const explode = useStore((s) => s.explode);
+  const wireframe = useStore((s) => s.wireframe);
+  const wireframeOpacity = useStore((s) => s.wireframeOpacity);
 
   const isTransparent = viewMode === 'transparent';
   const isChassisOnly = viewMode === 'chassis';
   const isExplodedMode = viewMode === 'exploded' || explode > 0.05;
+  const isWireframeActive = isChassisOnly || wireframe;
+  const opacityVal = wireframeOpacity;
 
   const currentPaint = isTransparent ? BODY_PAINT_TRANSPARENT : BODY_PAINT;
   const currentGlass = isTransparent ? { ...GLASS_SMOKED, opacity: 0.18 } : GLASS_SMOKED;
@@ -280,8 +377,93 @@ export function ProductionSuv() {
 
   return (
     <group name="production-suv-model">
-      {/* Render structural unibody frame when in transparent, chassis, or exploded mode */}
-      {(isTransparent || isChassisOnly || isExplodedMode) && <UnibodyFrame />}
+      {/* Render structural unibody frame when in transparent, chassis, exploded, or wireframe mode */}
+      {(isTransparent || isChassisOnly || isExplodedMode || wireframe) && <UnibodyFrame />}
+
+      {/* Transparent Electric Blue SUV Wireframe Outer Shell Overlay with Dynamic Opacity Control */}
+      {isWireframeActive && opacityVal > 0.01 && (
+        <group name="chassis-wireframe-overlay">
+          {/* Front Bumper & Fascia Wire Net */}
+          <mesh geometry={geoBumperFront} position={[0, 0, expK * 0.35]}>
+            <meshBasicMaterial color="#00e5ff" wireframe transparent opacity={opacityVal * 0.9} />
+          </mesh>
+
+          {/* Front Hood Wire Net */}
+          <mesh geometry={geoHood} position={[0, expK * 0.28, expK * 0.2]}>
+            <meshBasicMaterial color="#00e5ff" wireframe transparent opacity={opacityVal} />
+          </mesh>
+
+          {/* Front Fenders L & R Wire Net */}
+          <mesh geometry={geoFenderL} position={[-expK * 0.4, 0, expK * 0.15]}>
+            <meshBasicMaterial color="#00e5ff" wireframe transparent opacity={opacityVal * 0.9} />
+          </mesh>
+          <mesh geometry={geoFenderR} position={[expK * 0.4, 0, expK * 0.15]}>
+            <meshBasicMaterial color="#00e5ff" wireframe transparent opacity={opacityVal * 0.9} />
+          </mesh>
+
+          {/* Windshield Wire Net */}
+          <mesh geometry={geoWindshield}>
+            <meshBasicMaterial color="#00e5ff" wireframe transparent opacity={opacityVal * 0.8} />
+          </mesh>
+
+          {/* Front Doors L & R Wire Net */}
+          <mesh geometry={geoDoorFL} position={[-expK * 0.5, 0, 0]}>
+            <meshBasicMaterial color="#00e5ff" wireframe transparent opacity={opacityVal * 0.88} />
+          </mesh>
+          <mesh geometry={geoDoorFR} position={[expK * 0.5, 0, 0]}>
+            <meshBasicMaterial color="#00e5ff" wireframe transparent opacity={opacityVal * 0.88} />
+          </mesh>
+
+          {/* Rear Doors L & R Wire Net */}
+          <mesh geometry={geoDoorRL} position={[-expK * 0.5, 0, 0]}>
+            <meshBasicMaterial color="#00e5ff" wireframe transparent opacity={opacityVal * 0.88} />
+          </mesh>
+          <mesh geometry={geoDoorRR} position={[expK * 0.5, 0, 0]}>
+            <meshBasicMaterial color="#00e5ff" wireframe transparent opacity={opacityVal * 0.88} />
+          </mesh>
+
+          {/* Side Windows L & R Wire Net */}
+          <mesh geometry={geoGlassL} position={[-expK * 0.5, 0, 0]}>
+            <meshBasicMaterial color="#00e5ff" wireframe transparent opacity={opacityVal * 0.75} />
+          </mesh>
+          <mesh geometry={geoGlassR} position={[expK * 0.5, 0, 0]}>
+            <meshBasicMaterial color="#00e5ff" wireframe transparent opacity={opacityVal * 0.75} />
+          </mesh>
+
+          {/* Roof & Pillars Wire Net */}
+          <mesh geometry={geoRoof} position={[0, expK * 0.55, 0]}>
+            <meshBasicMaterial color="#00e5ff" wireframe transparent opacity={opacityVal} />
+          </mesh>
+
+          {/* Rear Quarter Panels L & R Wire Net */}
+          <mesh geometry={geoQuarterL} position={[-expK * 0.5, 0, 0]}>
+            <meshBasicMaterial color="#00e5ff" wireframe transparent opacity={opacityVal * 0.9} />
+          </mesh>
+          <mesh geometry={geoQuarterR} position={[expK * 0.5, 0, 0]}>
+            <meshBasicMaterial color="#00e5ff" wireframe transparent opacity={opacityVal * 0.9} />
+          </mesh>
+
+          {/* Rear Windscreen & Tailgate Wire Net */}
+          <mesh geometry={geoGlassRear} position={[0, 0, -expK * 0.45]}>
+            <meshBasicMaterial color="#00e5ff" wireframe transparent opacity={opacityVal * 0.78} />
+          </mesh>
+          <mesh geometry={geoTailgate} position={[0, 0, -expK * 0.45]}>
+            <meshBasicMaterial color="#00e5ff" wireframe transparent opacity={opacityVal * 0.9} />
+          </mesh>
+
+          {/* Rear Bumper Wire Net */}
+          <mesh geometry={geoBumperRearUpper} position={[0, 0, -expK * 0.45]}>
+            <meshBasicMaterial color="#00e5ff" wireframe transparent opacity={opacityVal * 0.9} />
+          </mesh>
+        </group>
+      )}
+
+      {/* Complete High-Fidelity SUV Interior Architecture */}
+      {!isChassisOnly && (
+        <group position={[0, expK * 0.15, 0]}>
+          <Cabin />
+        </group>
+      )}
 
       {/* Hide outer panels in chassis-only mode */}
       {!isChassisOnly && (

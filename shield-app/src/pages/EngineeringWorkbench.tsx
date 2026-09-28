@@ -23,6 +23,7 @@ export function EngineeringWorkbench() {
   const selected = useStore((s) => s.selected);
   const select = useStore((s) => s.select);
   const clearSelection = useStore((s) => s.clearSelection);
+  const viewMode = useStore((s) => s.viewMode);
   const setViewMode = useStore((s) => s.setViewMode);
   const setCadView = useStore((s) => s.setCadView);
   const xray = useStore((s) => s.xray);
@@ -705,8 +706,10 @@ export function EngineeringWorkbench() {
         }}
       >
         <div className="row" style={{ gap: 8 }}>
-          <button className="btn tiny" onClick={() => { setViewMode('skeletal'); setCadView(true); }}>BIW Skeleton</button>
-          <button className="btn tiny" onClick={() => { setViewMode('transparent'); setCadView(false); }}>Ghost Body</button>
+          <button className={`btn tiny ${viewMode === 'complete' ? 'active' : ''}`} onClick={() => { setViewMode('complete'); setCadView(false); }}>Complete Car</button>
+          <button className={`btn tiny ${viewMode === 'transparent' ? 'active' : ''}`} onClick={() => { setViewMode('transparent'); setCadView(false); }}>Ghost Body</button>
+          <button className={`btn tiny ${viewMode === 'chassis' ? 'active' : ''}`} onClick={() => { setViewMode('chassis'); setCadView(false); }}>Chassis Only</button>
+          <button className={`btn tiny ${viewMode === 'skeletal' ? 'active' : ''}`} onClick={() => { setViewMode('skeletal'); setCadView(true); }}>BIW Skeleton</button>
           <button className={`btn tiny ${xray ? 'active' : ''}`} onClick={() => setXray(!xray)}>X-Ray</button>
           <button className={`btn tiny ${wireframe ? 'active' : ''}`} onClick={() => setWireframe(!wireframe)}>FEA Wireframe</button>
           <button className="btn tiny" onClick={returnToBaseline} title="Return to EOL Baseline">↺ Reset Baseline</button>

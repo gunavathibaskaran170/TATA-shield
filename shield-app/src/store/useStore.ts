@@ -88,10 +88,12 @@ interface Store {
   /* ---------------- render modes ---------------- */
   xray: boolean;
   wireframe: boolean;
+  wireframeOpacity: number;
   dimOthers: boolean;
   setXray: (v: boolean) => void;
   toggleXray: () => void;
   setWireframe: (v: boolean) => void;
+  setWireframeOpacity: (v: number) => void;
   setDimOthers: (v: boolean) => void;
 
   /* ---------------- explosion ---------------- */
@@ -299,10 +301,12 @@ export const useStore = create<Store>((set, get) => ({
   /* ---------------- render modes ---------------- */
   xray: false,
   wireframe: false,
+  wireframeOpacity: 0.35,
   dimOthers: true,
   setXray: (v) => set({ xray: v, ghosted: v ? {} : get().ghosted }),
   toggleXray: () => set((s) => ({ xray: !s.xray, ghosted: s.xray ? s.ghosted : {} })),
   setWireframe: (v) => set({ wireframe: v }),
+  setWireframeOpacity: (v) => set({ wireframeOpacity: Math.max(0, Math.min(1, v)) }),
   setDimOthers: (v) => set({ dimOthers: v }),
 
   /* ---------------- explosion ---------------- */

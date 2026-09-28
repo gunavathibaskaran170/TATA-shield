@@ -969,61 +969,150 @@ export const CATALOG: ComponentDef[] = [
   }),
 
   /* ------------------------------------------------ CABIN */
-  c('InteriorTrim_Floor', 'Cabin floor trim', CB, 'SYS_CABIN', 3, 'panel', {
-    side: 'CENTER', material: 'Carpet over moulded pad', manufacturingProcess: 'Moulded',
-    explodeDir: [0, 1, 0], explodeGroup: 2, massKg: 4.2,
+  c('InteriorTrim_Floor', 'Cabin acoustic floor carpeting', CB, 'SYS_CABIN', 3, 'panel', {
+    side: 'CENTER', material: 'Carpet over molded polyurethane acoustic deadener', manufacturingProcess: 'Compression molded',
+    explodeDir: [0, 1, 0], explodeGroup: 2, massKg: 5.4,
+    description: 'Full-length molded sound-deadening cabin floor carpet pan with integrated driver heel pad and dead-pedal rest.',
   }),
-  c('InteriorTrim_Headliner', 'Headliner', CB, 'SYS_CABIN', 3, 'panel', {
-    side: 'CENTER', material: 'Moulded headliner', manufacturingProcess: 'Moulded',
-    explodeDir: [0, -1, 0], explodeGroup: 2, massKg: 1.6,
+  c('InteriorTrim_Headliner', 'Molded acoustic headliner', CB, 'SYS_CABIN', 3, 'panel', {
+    side: 'CENTER', material: 'Multi-layer composite substrate with knitted fabric finish', manufacturingProcess: 'Thermoformed',
+    explodeDir: [0, -1, 0], explodeGroup: 2, massKg: 2.2,
+    description: 'Thermoformed roof headliner panel with integrated wiring channels, microphone apertures, and sun visor pivots.',
   }),
-  c('DashboardCarrier', 'Dashboard carrier', CB, 'SYS_CABIN', 4, 'panel', {
-    side: 'CENTER', material: 'Steel + magnesium', manufacturingProcess: 'Stamped + cast',
-    explodeDir: [0, 1, 0], explodeGroup: 2, massKg: 9.8,
+  c('InteriorTrim_Cargo', 'Rear cargo load floor & parcel shelf', CB, 'SYS_CABIN', 3, 'panel', {
+    side: 'CENTER', region: 'R1', material: 'Reinforced honeycomb composite with felt lining', manufacturingProcess: 'Molded',
+    explodeDir: [0, 1, -0.3], explodeGroup: 2, massKg: 3.8,
+    description: 'Rear tonneau luggage parcel shelf and heavy-duty flat cargo load floor with luggage tie-down anchors.',
   }),
-  c('InstrumentCluster', 'Instrument cluster', CB, 'SYS_CABIN', 4, 'electronics', {
-    side: 'CENTER', material: 'Display module', manufacturingProcess: 'Assembled',
-    explodeDir: [0, 1, 0], explodeGroup: 2, massKg: 0.7,
+  c('CrossCarBeam', 'Cross-car structural beam (CCB)', CB, 'SYS_CABIN', 4, 'beam', {
+    side: 'CENTER', region: 'C1', material: 'Die-cast magnesium AM60B + high-strength tubular steel', manufacturingProcess: 'High-pressure die cast + welded',
+    explodeDir: [0, 1, 0.2], explodeGroup: 2, massKg: 6.8,
+    description: 'Primary structural cross-car instrument panel carrier beam tying left and right A-pillars, supporting the steering column assembly and passenger airbag.',
   }),
-  c('CenterDisplay', 'Centre display', CB, 'SYS_CABIN', 4, 'electronics', {
-    side: 'CENTER', material: 'Touch display module', manufacturingProcess: 'Assembled',
-    explodeDir: [0, 1, 0], explodeGroup: 2, massKg: 1.1,
+  c('DashboardCarrier', 'Multi-tier cockpit dashboard carrier', CB, 'SYS_CABIN', 4, 'panel', {
+    side: 'CENTER', region: 'C1', material: 'Soft-touch slush-molded TPO with satin metallic trim & ABS substrate', manufacturingProcess: 'Slush molded skin + foam injection',
+    explodeDir: [0, 1, 0.2], explodeGroup: 2, massKg: 8.6,
+    description: 'Ergonomic two-tier cockpit dashboard assembly with soft-touch upper dash, satin metallic horizontal wing, and passenger glovebox compartment.',
   }),
-  c('HVACModule_Cabin', 'Cabin HVAC module', CB, 'SYS_CABIN', 4, 'box', {
-    side: 'CENTER', material: 'HVAC unit housing', manufacturingProcess: 'Moulded + assembled',
-    explodeDir: [0, 1, 0], explodeGroup: 2, massKg: 8.6,
+  c('InstrumentCluster', 'Driver 10.25-inch digital gauge cluster', CB, 'SYS_CABIN', 4, 'electronics', {
+    side: 'L', region: 'C1', material: 'Full HD anti-glare IPS LCD panel with magnesium heatsink', manufacturingProcess: 'Optical bonding + automated assembly',
+    explodeDir: [-0.3, 1, 0.2], explodeGroup: 2, massKg: 0.85,
+    description: 'Driver instrument cluster displaying real-time speed, ADAS lane visualization, battery SOC, motor power demand, and thermal alarms.',
   }),
-  c('PedalBox', 'Pedal box', CB, 'SYS_CABIN', 4, 'box', {
-    side: 'CENTER', material: 'Steel pedal assembly', manufacturingProcess: 'Welded',
-    explodeDir: [0, 1, 0], explodeGroup: 2, massKg: 1.9,
+  c('CenterDisplay', '12.3-inch panoramic central infotainment display', CB, 'SYS_CABIN', 4, 'electronics', {
+    side: 'CENTER', region: 'C1', material: 'Capacitive touch ultra-HD display with gorilla glass cover', manufacturingProcess: 'Optical bonding + automated assembly',
+    explodeDir: [0, 1, 0.2], explodeGroup: 2, massKg: 1.35,
+    description: 'Floating central infotainment touch display angled towards the driver, providing navigation, energy management, climate control, and digital twin telemetry.',
   }),
-  c('Seat_FL', 'Front seat — left', CB, 'SYS_CABIN', 4, 'seat', {
-    side: 'L', material: 'Frame + foam + trim', manufacturingProcess: 'Assembled',
-    explodeDir: [-0.6, 1, 0], explodeGroup: 2, massKg: 18.4,
+  c('SteeringWheel', 'Flat-bottom EV sports steering wheel', CB, 'SYS_CABIN', 4, 'wheel', {
+    side: 'L', region: 'C1', material: 'Magnesium skeleton + perforated synthetic leather wrap + capacitive switches', manufacturingProcess: 'Cast core + molded foam + hand-stitched',
+    explodeDir: [-0.4, 1, 0.1], explodeGroup: 2, massKg: 2.8,
+    description: 'Modern flat-bottom 3-spoke sports steering wheel with thumb rests, capacitive ADAS/media switch pods, and center horn boss with SHIELD emblem.',
   }),
-  c('Seat_FR', 'Front seat — right', CB, 'SYS_CABIN', 4, 'seat', {
-    side: 'R', material: 'Frame + foam + trim', manufacturingProcess: 'Assembled',
-    explodeDir: [0.6, 1, 0], explodeGroup: 2, massKg: 18.4,
+  c('SteeringColumn', 'Steering column shroud & control stalks', CB, 'SYS_CABIN', 4, 'cylinder', {
+    side: 'L', region: 'C1', material: 'Telescopic steel column with twin multifunction control stalks & regen paddles', manufacturingProcess: 'Machined + molded shroud',
+    explodeDir: [-0.4, 1, 0.1], explodeGroup: 2, massKg: 3.4,
+    description: 'Adjustable steering column housing with turn-indicator/wiper stalks and regenerative braking selector paddles.',
   }),
-  c('RearBench', 'Rear bench seat', CB, 'SYS_CABIN', 4, 'seat', {
-    side: 'CENTER', material: 'Frame + foam + trim', manufacturingProcess: 'Assembled',
-    explodeDir: [0, 1, 0], explodeGroup: 2, massKg: 22.6,
+  c('CenterConsole', 'Floating bridge center console', CB, 'SYS_CABIN', 4, 'panel', {
+    side: 'CENTER', region: 'C1', material: 'Leatherette padded bridge with rotary EV shift dial & wireless charger', manufacturingProcess: 'Injection molded + wrapped',
+    explodeDir: [0, 1, 0], explodeGroup: 2, massKg: 6.2,
+    description: 'Floating center console bridge with knurled rotary shift-by-wire dial, EPB switch, wireless smartphone charging pad, twin cupholders, and split-armrest storage box.',
   }),
-  c('SeatRail_FL', 'Seat rail — left', CB, 'SYS_CABIN', 4, 'rail', {
-    side: 'L', material: 'Steel rail', manufacturingProcess: 'Stamped',
-    explodeDir: [-0.6, 1, 0], explodeGroup: 2, massKg: 1.6,
+  c('HVACModule_Cabin', 'Cabin climate distribution module & louvers', CB, 'SYS_CABIN', 4, 'box', {
+    side: 'CENTER', region: 'C1', material: 'Polypropylene housing with stepper actuators & hidden continuous air vents', manufacturingProcess: 'Molded + automated assembly',
+    explodeDir: [0, 1, 0.1], explodeGroup: 2, massKg: 7.2,
+    description: 'Dual-zone cabin climate distribution assembly with continuous horizontal dashboard air vent blades and rear seat ventilation ducts.',
   }),
-  c('SeatRail_FR', 'Seat rail — right', CB, 'SYS_CABIN', 4, 'rail', {
-    side: 'R', material: 'Steel rail', manufacturingProcess: 'Stamped',
-    explodeDir: [0.6, 1, 0], explodeGroup: 2, massKg: 1.6,
+  c('PedalBox', 'Drive-by-wire ergonomic pedal assembly', CB, 'SYS_CABIN', 4, 'box', {
+    side: 'L', region: 'C1', material: 'Reinforced glass-filled polyamide + forged steel pedals + rubber pads', manufacturingProcess: 'Molded + stamped',
+    explodeDir: [-0.4, 1, 0.3], explodeGroup: 2, massKg: 2.1,
+    description: 'Electronic drive-by-wire throttle pedal, heavy-duty brake pedal with anti-slip rubber ribs, and driver dead-pedal footrest plate.',
   }),
-  c('SeatbeltAnchor_FL', 'Seat-belt anchor — left', CB, 'SYS_CABIN', 4, 'box', {
-    side: 'L', material: 'Steel anchor', manufacturingProcess: 'Forged',
-    explodeDir: [-0.6, 1, 0], explodeGroup: 2, massKg: 0.6,
+  c('OverheadConsole', 'Overhead roof console & interior lighting', CB, 'SYS_CABIN', 4, 'box', {
+    side: 'CENTER', region: 'C1', material: 'Molded ABS/PC with touch LED map lights & SOS telematics', manufacturingProcess: 'Molded + PCB assembly',
+    explodeDir: [0, -1, 0.2], explodeGroup: 2, massKg: 0.65,
+    description: 'Windshield header roof console with capacitive reading lights, ambient LED strip, and emergency SOS e-call button.',
   }),
-  c('AirbagModules', 'Airbag modules', CB, 'SYS_CABIN', 4, 'box', {
-    side: 'CENTER', material: 'Airbag ECU + inflators', manufacturingProcess: 'Assembled',
-    explodeDir: [0, 1, 0], explodeGroup: 2, massKg: 3.4,
+  c('RearviewMirror', 'Frameless auto-dimming rearview mirror', CB, 'SYS_CABIN', 4, 'box', {
+    side: 'CENTER', region: 'C1', material: 'Electrochromic glass + camera bracket', manufacturingProcess: 'Assembled',
+    explodeDir: [0, -1, 0.2], explodeGroup: 2, massKg: 0.45,
+    description: 'Frameless electrochromic auto-dimming central rearview mirror with integrated ADAS camera cowl mount.',
+  }),
+  c('Seat_FL', 'Driver ergonomic bucket seat (8-way power)', CB, 'SYS_CABIN', 4, 'seat', {
+    side: 'L', region: 'C1', material: 'High-strength steel skeleton + dual-density PU foam + perforated leatherette', manufacturingProcess: 'Welded frame + molded foam + stitched trim',
+    explodeDir: [-0.6, 1, 0.1], explodeGroup: 2, massKg: 19.2,
+    description: 'Ergonomically contoured driver bucket seat featuring deep side thigh and torso bolsters, 8-way power adjustment, and twin-post adjustable headrest.',
+  }),
+  c('Seat_FR', 'Passenger ergonomic bucket seat (6-way power)', CB, 'SYS_CABIN', 4, 'seat', {
+    side: 'R', region: 'C1', material: 'High-strength steel skeleton + dual-density PU foam + perforated leatherette', manufacturingProcess: 'Welded frame + molded foam + stitched trim',
+    explodeDir: [0.6, 1, 0.1], explodeGroup: 2, massKg: 18.6,
+    description: 'Sculpted front passenger bucket seat with supportive lateral bolsters, power recline, and twin-post adjustable headrest.',
+  }),
+  c('RearBench', 'Rear 60:40 split 3-passenger bench seat', CB, 'SYS_CABIN', 4, 'seat', {
+    side: 'CENTER', region: 'C2', material: 'Steel tubular frame + high-resilience foam + fold-down center armrest', manufacturingProcess: 'Welded frame + molded foam + stitched trim',
+    explodeDir: [0, 1, -0.2], explodeGroup: 2, massKg: 24.8,
+    description: '60:40 split-folding 3-passenger rear bench with ergonomic outboard contours, 3 adjustable headrests, fold-down center armrest with twin cupholders, and ISOFIX child seat anchors.',
+  }),
+  c('Seat_RL', 'Rear seat — left outboard cushion', CB, 'SYS_CABIN', 4, 'seat', {
+    side: 'L', region: 'C2', material: 'Steel tubular frame + high-resilience foam + leatherette', manufacturingProcess: 'Welded frame + molded foam',
+    explodeDir: [-0.5, 1, -0.2], explodeGroup: 2, massKg: 10.2,
+    description: 'Left outboard rear seat with contoured lateral support and adjustable headrest.',
+  }),
+  c('Seat_RC', 'Rear seat — center perch & fold armrest', CB, 'SYS_CABIN', 4, 'seat', {
+    side: 'CENTER', region: 'C2', material: 'Steel tubular frame + foam + fold-down armrest', manufacturingProcess: 'Assembled',
+    explodeDir: [0, 1, -0.2], explodeGroup: 2, massKg: 4.4,
+    description: 'Center rear passenger seating position with integrated fold-down armrest and twin cupholders.',
+  }),
+  c('Seat_RR', 'Rear seat — right outboard cushion', CB, 'SYS_CABIN', 4, 'seat', {
+    side: 'R', region: 'C2', material: 'Steel tubular frame + high-resilience foam + leatherette', manufacturingProcess: 'Welded frame + molded foam',
+    explodeDir: [0.5, 1, -0.2], explodeGroup: 2, massKg: 10.2,
+    description: 'Right outboard rear seat with contoured lateral support and adjustable headrest.',
+  }),
+  c('SeatRail_FL', 'Front seat slider track assembly — left', CB, 'SYS_CABIN', 4, 'rail', {
+    side: 'L', region: 'C1', material: 'High-strength cold-rolled steel rails with ball bearings', manufacturingProcess: 'Roll formed + stamped',
+    explodeDir: [-0.6, 1, 0.1], explodeGroup: 2, massKg: 1.8,
+    description: 'Dual longitudinal seat slider track with motorized lead-screw positioning mechanism for driver seat.',
+  }),
+  c('SeatRail_FR', 'Front seat slider track assembly — right', CB, 'SYS_CABIN', 4, 'rail', {
+    side: 'R', region: 'C1', material: 'High-strength cold-rolled steel rails with ball bearings', manufacturingProcess: 'Roll formed + stamped',
+    explodeDir: [0.6, 1, 0.1], explodeGroup: 2, massKg: 1.8,
+    description: 'Dual longitudinal seat slider track with manual/motorized positioning mechanism for passenger seat.',
+  }),
+  c('SeatbeltAnchor_FL', 'Pyrotechnic seatbelt pre-tensioner — FL', CB, 'SYS_CABIN', 4, 'box', {
+    side: 'L', region: 'C1', material: 'Forged steel anchor bracket with pyrotechnic tensioner', manufacturingProcess: 'Forged + automated assembly',
+    explodeDir: [-0.7, 1, 0.1], explodeGroup: 2, massKg: 0.8,
+    description: 'B-pillar and seat base pyrotechnic pre-tensioner seatbelt buckle anchor with buckle sensor switch.',
+  }),
+  c('SeatbeltAnchor_FR', 'Pyrotechnic seatbelt pre-tensioner — FR', CB, 'SYS_CABIN', 4, 'box', {
+    side: 'R', region: 'C1', material: 'Forged steel anchor bracket with pyrotechnic tensioner', manufacturingProcess: 'Forged + automated assembly',
+    explodeDir: [0.7, 1, 0.1], explodeGroup: 2, massKg: 0.8,
+    description: 'B-pillar and seat base pyrotechnic pre-tensioner seatbelt buckle anchor with buckle sensor switch.',
+  }),
+  c('DoorTrim_FL', 'Interior door trim card — front left (driver)', CB, 'SYS_CABIN', 4, 'panel', {
+    side: 'L', region: 'C1', material: 'Molded polypropylene core + soft-touch leatherette armrest + satin chrome release lever', manufacturingProcess: 'Injection molded + vacuum formed skin',
+    explodeDir: [-1, 0.2, 0.2], explodeGroup: 3, massKg: 3.6,
+    description: 'Molded front driver door card featuring master power window/mirror switchpack, satin chrome release handle, grab handle, map pocket with 1L bottle holder, and premium acoustic speaker grille.',
+  }),
+  c('DoorTrim_FR', 'Interior door trim card — front right (passenger)', CB, 'SYS_CABIN', 4, 'panel', {
+    side: 'R', region: 'C1', material: 'Molded polypropylene core + soft-touch leatherette armrest + satin chrome release lever', manufacturingProcess: 'Injection molded + vacuum formed skin',
+    explodeDir: [1, 0.2, 0.2], explodeGroup: 3, massKg: 3.4,
+    description: 'Molded front passenger door card with power window switch, satin chrome door handle, soft armrest, door storage pocket, and speaker grille.',
+  }),
+  c('DoorTrim_RL', 'Interior door trim card — rear left', CB, 'SYS_CABIN', 4, 'panel', {
+    side: 'L', region: 'C2', material: 'Molded polypropylene core + soft armrest + chrome handle', manufacturingProcess: 'Injection molded',
+    explodeDir: [-1, 0.2, -0.2], explodeGroup: 3, massKg: 2.9,
+    description: 'Rear left door card with power window switch, satin chrome handle, grab armrest, bottle storage pocket, and speaker grille.',
+  }),
+  c('DoorTrim_RR', 'Interior door trim card — rear right', CB, 'SYS_CABIN', 4, 'panel', {
+    side: 'R', region: 'C2', material: 'Molded polypropylene core + soft armrest + chrome handle', manufacturingProcess: 'Injection molded',
+    explodeDir: [1, 0.2, -0.2], explodeGroup: 3, massKg: 2.9,
+    description: 'Rear right door card with power window switch, satin chrome handle, grab armrest, bottle storage pocket, and speaker grille.',
+  }),
+  c('AirbagModules', 'Supplemental Restraint System (SRS) airbag modules', CB, 'SYS_CABIN', 4, 'box', {
+    side: 'CENTER', region: 'C1', material: 'Woven nylon airbags + pyrotechnic inflators + magnesium housings', manufacturingProcess: 'Assembled',
+    explodeDir: [0, 1, 0.1], explodeGroup: 2, massKg: 4.8,
+    description: 'Comprehensive SRS package including driver steering wheel airbag, passenger front dashboard airbag, front seat side thorax airbags, and full-length side curtain airbags.',
   }),
 
   /* ------------------------------------------------ THERMAL */

@@ -91,6 +91,8 @@ function TwinToolbar() {
   const setXray = useStore((s) => s.setXray);
   const wireframe = useStore((s) => s.wireframe);
   const setWireframe = useStore((s) => s.setWireframe);
+  const wireframeOpacity = useStore((s) => s.wireframeOpacity);
+  const setWireframeOpacity = useStore((s) => s.setWireframeOpacity);
   const dimOthers = useStore((s) => s.dimOthers);
   const setDimOthers = useStore((s) => s.setDimOthers);
   const explode = useStore((s) => s.explode);
@@ -169,6 +171,21 @@ function TwinToolbar() {
         >
           CAD cutaway
         </button>
+      </div>
+
+      {/* Wireframe Opacity Slider */}
+      <div className="row" style={{ gap: 4, background: 'rgba(0, 229, 255, 0.08)', padding: '2px 8px', borderRadius: 4, border: '1px solid rgba(0, 229, 255, 0.25)' }}>
+        <span className="tiny" style={{ color: '#00e5ff', fontWeight: 600 }}>Shell Opacity</span>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.02}
+          value={wireframeOpacity}
+          onChange={(e) => setWireframeOpacity(parseFloat(e.target.value))}
+          style={{ width: 80, height: 12, accentColor: '#00e5ff' }}
+        />
+        <span className="mono tiny" style={{ color: '#67e8f9', width: 32 }}>{Math.round(wireframeOpacity * 100)}%</span>
       </div>
 
       {/* battery modes */}

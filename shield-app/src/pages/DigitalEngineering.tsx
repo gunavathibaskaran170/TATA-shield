@@ -103,25 +103,32 @@ export function DigitalEngineering() {
         {/* Viewport & Inspection Toggles */}
         <div className="row wrap" style={{ gap: 6 }}>
           <button
-            className={`btn ${viewMode === 'skeletal' ? 'active' : ''}`}
-            onClick={() => { setViewMode('skeletal'); setCadView(true); }}
-            title="Skeletal BIW & Chassis Frame"
+            className={`btn ${viewMode === 'complete' ? 'active' : ''}`}
+            onClick={() => { setViewMode('complete'); setCadView(false); }}
+            title="Complete Production Vehicle"
           >
-            BIW / Chassis
+            🚘 Complete Car
           </button>
           <button
             className={`btn ${viewMode === 'transparent' ? 'active' : ''}`}
             onClick={() => { setViewMode('transparent'); setCadView(false); }}
             title="Translucent Body Shell"
           >
-            Ghost Shell
+            💎 Transparent Body
           </button>
           <button
-            className={`btn ${viewMode === 'complete' ? 'active' : ''}`}
-            onClick={() => { setViewMode('complete'); setCadView(false); }}
-            title="Complete Production Vehicle"
+            className={`btn ${viewMode === 'chassis' ? 'active' : ''}`}
+            onClick={() => { setViewMode('chassis'); setCadView(false); }}
+            title="Bare Chassis & Subframe Assembly"
           >
-            Production Body
+            🏎️ Chassis Only
+          </button>
+          <button
+            className={`btn ${viewMode === 'skeletal' ? 'active' : ''}`}
+            onClick={() => { setViewMode('skeletal'); setCadView(true); }}
+            title="Skeletal BIW & Structural Nodes"
+          >
+            🦴 BIW Frame
           </button>
           <div style={{ width: 1, height: 18, background: 'var(--line)', margin: '0 4px' }} />
           <button

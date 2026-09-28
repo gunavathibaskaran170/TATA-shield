@@ -27,6 +27,8 @@ export function LiveDigitalTwin() {
   const setCadView = useStore((s) => s.setCadView);
   const heatmapMode = useStore((s) => s.heatmapMode);
   const setHeatmapMode = useStore((s) => s.setHeatmapMode);
+  const wireframeOpacity = useStore((s) => s.wireframeOpacity);
+  const setWireframeOpacity = useStore((s) => s.setWireframeOpacity);
   const select = useStore((s) => s.select);
   const clearSelection = useStore((s) => s.clearSelection);
   const navigate = useStore((s) => s.navigate);
@@ -156,13 +158,28 @@ export function LiveDigitalTwin() {
             <div className="tiny faint" style={{ textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
               Structural Inspection Mode
             </div>
-            <div className="grid3" style={{ gap: 4 }}>
-              <button className={`btn tiny ${viewMode === 'complete' ? 'active' : ''}`} onClick={() => { setViewMode('complete'); setCadView(false); }}>Body Shell</button>
-              <button className={`btn tiny ${viewMode === 'transparent' ? 'active' : ''}`} onClick={() => { setViewMode('transparent'); setCadView(false); }}>Ghost Body</button>
-              <button className={`btn tiny ${viewMode === 'skeletal' ? 'active' : ''}`} onClick={() => { setViewMode('skeletal'); setCadView(true); }}>BIW / Chassis</button>
+            <div className="grid4" style={{ gap: 4 }}>
+              <button className={`btn tiny ${viewMode === 'complete' ? 'active' : ''}`} onClick={() => { setViewMode('complete'); setCadView(false); }}>🚘 Complete Car</button>
+              <button className={`btn tiny ${viewMode === 'transparent' ? 'active' : ''}`} onClick={() => { setViewMode('transparent'); setCadView(false); }}>💎 Transparent Body</button>
+              <button className={`btn tiny ${viewMode === 'chassis' ? 'active' : ''}`} onClick={() => { setViewMode('chassis'); setCadView(false); }}>🏎️ Chassis Only</button>
+              <button className={`btn tiny ${viewMode === 'skeletal' ? 'active' : ''}`} onClick={() => { setViewMode('skeletal'); setCadView(true); }}>🦴 BIW Frame</button>
               <button className={`btn tiny ${heatmapMode === 'strain' ? 'active' : ''}`} onClick={() => setHeatmapMode(heatmapMode === 'strain' ? 'off' : 'strain')}>Strain Map</button>
               <button className={`btn tiny ${heatmapMode === 'stress' ? 'active' : ''}`} onClick={() => setHeatmapMode(heatmapMode === 'stress' ? 'off' : 'stress')}>Stress (Calc)</button>
               <button className={`btn tiny ${heatmapMode === 'anomaly' ? 'active' : ''}`} onClick={() => setHeatmapMode(heatmapMode === 'anomaly' ? 'off' : 'anomaly')}>Residual Heat</button>
+            </div>
+            {/* Shell Wireframe Opacity Adjustment */}
+            <div className="spread" style={{ marginTop: 6, background: 'rgba(0, 229, 255, 0.08)', padding: '4px 8px', borderRadius: 4, border: '1px solid rgba(0, 229, 255, 0.25)' }}>
+              <span className="tiny" style={{ color: '#00e5ff', fontWeight: 600 }}>Blue Shell Opacity:</span>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.02}
+                value={wireframeOpacity}
+                onChange={(e) => setWireframeOpacity(parseFloat(e.target.value))}
+                style={{ width: 110, height: 12, accentColor: '#00e5ff' }}
+              />
+              <span className="mono tiny" style={{ color: '#67e8f9', width: 32, textAlign: 'right' }}>{Math.round(wireframeOpacity * 100)}%</span>
             </div>
           </div>
 
