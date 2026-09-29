@@ -5,6 +5,7 @@ import {
 import { useStore } from '../store/useStore';
 import { SENSORS } from '../data/sensors';
 import { Card, StatusChip, ProvTag, Seg, pct } from '../ui/kit';
+import { PageHeader } from '../ui/PageHeader';
 
 const SIGNAL_HEX: Record<string, string> = {
   strain: '#38d9cf', acceleration: '#4f8cff', temperature: '#ff8b2b', vibration: '#c9b8ff', displacement: '#f2b94e',
@@ -33,33 +34,35 @@ export function LiveTelemetry() {
   const heat = (an: number) => (an > 0.66 ? 'var(--red)' : an > 0.33 ? 'var(--amber)' : 'var(--green)');
 
   return (
-    <div className="col stack splash-fade" style={{ padding: 14, maxWidth: 1500 }}>
-      <div className="spread wrap">
-        <div>
-          <h2 className="h3" style={{ margin: 0 }}>Live Telemetry</h2>
-          <div className="tiny muted">
-            Rolling sensor streams + residual analytics. Feed is swappable mock ↔ MQTT/hardware without any UI change (see Settings).
+    <div className="col" style={{ width: '100%', minHeight: '100%', fontFamily: 'var(--font-sans)' }}>
+      <PageHeader
+        title="Live Telemetry Stream"
+        description="High-frequency sensor channel stream, trend lines, and baseline residual analysis."
+        actions={
+          <div className="row wrap">
+            <select
+              value={sensorId}
+              onChange={(e) => setSensorId(e.target.value)}
+              style={{ width: 240 }}
+            >
+              {SENSORS.map((s) => <option key={s.id} value={s.id}>{s.id} — {s.name}</option>)}
+            </select>
+            <Seg
+              options={[
+                { value: 'value', label: 'Signal' },
+                { value: 'anomaly', label: 'Anomaly vs baseline' },
+              ]}
+              value={chart}
+              onChange={setChart}
+            />
+            <span className="chip st-normal"><span className="dot dot-normal" /> LIVE · Mock stream</span>
           </div>
+        }
+      />
+      <div className="col stack splash-fade" style={{ padding: 16 }}>
+        <div className="tiny muted">
+          Rolling sensor streams + residual analytics. Feed is swappable mock ↔ MQTT/hardware without any UI change (see Settings).
         </div>
-        <div className="row wrap">
-          <select
-            value={sensorId}
-            onChange={(e) => setSensorId(e.target.value)}
-            style={{ width: 240 }}
-          >
-            {SENSORS.map((s) => <option key={s.id} value={s.id}>{s.id} — {s.name}</option>)}
-          </select>
-          <Seg
-            options={[
-              { value: 'value', label: 'Signal' },
-              { value: 'anomaly', label: 'Anomaly vs baseline' },
-            ]}
-            value={chart}
-            onChange={setChart}
-          />
-          <span className="chip st-normal"><span className="dot dot-normal" /> LIVE · Mock stream</span>
-        </div>
-      </div>
 
       <div className="grid2">
         {/* ---- chart ---- */}
@@ -201,6 +204,7 @@ export function LiveTelemetry() {
           Values stream ~4 Hz per sensor (mock). The row you select drives the chart above.
         </div>
       </Card>
+      </div>
     </div>
   );
 }

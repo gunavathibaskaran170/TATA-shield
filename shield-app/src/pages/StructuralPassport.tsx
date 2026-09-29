@@ -15,6 +15,7 @@ import { SENSORS } from '../data/sensors';
 import { ALL_FASTENERS } from '../data/fasteners';
 import { METROLOGY_DATUM_POINTS, BATTERY_MOUNTS, DESIGN_REVISIONS } from '../data/engineering';
 import { Card, Stat, StatusChip, ProvTag } from '../ui/kit';
+import { PageHeader } from '../ui/PageHeader';
 
 export function StructuralPassport() {
   const vehicleId = useStore((s) => s.vehicleId);
@@ -59,44 +60,18 @@ export function StructuralPassport() {
   };
 
   return (
-    <div className="col stack splash-fade" style={{ padding: 14, maxWidth: 1500 }}>
-      {/* Top Header */}
-      <div className="spread wrap">
-        <div className="row" style={{ gap: 12 }}>
-          <div
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: 6,
-              background: 'linear-gradient(135deg, #0f766e, #115e59)',
-              border: '1px solid #14b8a6',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#5eead4',
-              fontWeight: 800,
-              fontSize: 14,
-            }}
-          >
-            07
-          </div>
-          <div>
-            <div className="row" style={{ gap: 8 }}>
-              <h2 className="h3" style={{ margin: 0, fontSize: 16 }}>
-                VEHICLE DIGITAL PASSPORT & STRUCTURAL LEDGER
-              </h2>
-              <span className="prov prov-verified">ONE VEHICLE · ONE RECORD</span>
-            </div>
-            <div className="tiny faint" style={{ marginTop: 2 }}>
-              Persistent Single-Source Engineering History from Design Intent to Factory Metrology to Road Operation
-            </div>
-          </div>
-        </div>
-
+    <div className="col" style={{ width: '100%', minHeight: '100%', fontFamily: 'var(--font-sans)' }}>
+      <PageHeader
+        title="Vehicle Digital Passport & Structural Ledger"
+        description="Persistent Single-Source Engineering History from Design Intent to Factory Metrology to Road Operation."
+        badge="ONE VEHICLE · ONE RECORD"
+        badgeType="success"
+      >
         <button className="btn accent" onClick={exportPassport} style={{ background: '#0d9488', color: '#fff', border: 'none', fontWeight: 600 }}>
           ⬇ Export Official Passport (JSON)
         </button>
-      </div>
+      </PageHeader>
+      <div className="col stack splash-fade" style={{ padding: 24 }}>
 
       {/* Vehicle Identity Banner */}
       <div className="panel" style={{ padding: 12, background: 'linear-gradient(90deg, rgba(15,118,110,0.25), transparent)' }}>
@@ -230,6 +205,7 @@ export function StructuralPassport() {
           "No monitored abnormal structural deviation was detected within the demonstrated validation conditions, with the exception of the documented localized plastic settling on rear mounting bracket Mount_BRL following Event R-1042, which remains contained under WATCH state monitoring."
         </div>
       </div>
+    </div>
     </div>
   );
 }

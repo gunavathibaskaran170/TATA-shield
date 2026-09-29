@@ -192,6 +192,26 @@ interface Store {
   setCurrentRevision: (r: DesignRevision) => void;
   activeCaeLoadCase: CaeLoadCase;
   setActiveCaeLoadCase: (c: CaeLoadCase) => void;
+  caeStep: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+  setCaeStep: (step: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8) => void;
+  caeState: 'SETUP' | 'RUNNING' | 'RESPONSE' | 'RESULT';
+  setCaeState: (st: 'SETUP' | 'RUNNING' | 'RESPONSE' | 'RESULT') => void;
+  caeAnimationProgress: number;
+  setCaeAnimationProgress: (v: number) => void;
+  caeMetric: 'stress' | 'strain' | 'displacement' | 'loadpath';
+  setCaeMetric: (m: 'stress' | 'strain' | 'displacement' | 'loadpath') => void;
+  caeDeformationScale: number;
+  setCaeDeformationScale: (s: number) => void;
+  caeProbeActive: boolean;
+  setCaeProbeActive: (v: boolean) => void;
+  caeProbeData: { location: string; stressMpa: number; strainMicro: number; dispMm: number; coords: [number, number, number] } | null;
+  setCaeProbeData: (data: { location: string; stressMpa: number; strainMicro: number; dispMm: number; coords: [number, number, number] } | null) => void;
+  caeMeshView: boolean;
+  setCaeMeshView: (v: boolean) => void;
+  caeMaterialColorView: boolean;
+  setCaeMaterialColorView: (v: boolean) => void;
+  compareRevisions: boolean;
+  setCompareRevisions: (v: boolean) => void;
   activeTestRig: TestRigType;
   setActiveTestRig: (r: TestRigType) => void;
   activeRoadSector: RoadSectorId;
@@ -288,8 +308,18 @@ const DEFAULT_LAYER_OPACITY: Record<number, number> = {};
 for (let i = 0; i <= 21; i++) DEFAULT_LAYER_OPACITY[i] = 1;
 
 export const useStore = create<Store>((set, get) => ({
-  page: 'command',
-  navigate: (p) => set({ page: p }),
+  page: 'digital_eng',
+  navigate: (p) => {
+    // Map legacy/removed page routes to primary workflow stages
+    const routeMap: Record<string, PageKey> = {
+      forensics: 'live_twin',
+      fleet: 'live_twin',
+      investigations: 'live_twin',
+      reports: 'live_twin',
+    };
+    const targetPage = routeMap[p] ?? p;
+    set({ page: targetPage });
+  },
 
   vehicleId: 'EV-DEMO-0287',
 
@@ -554,8 +584,28 @@ export const useStore = create<Store>((set, get) => ({
   /* ---------------- engineering lifecycle & validation ---------------- */
   currentRevision: 'REV-B',
   setCurrentRevision: (r) => set({ currentRevision: r }),
-  activeCaeLoadCase: 'torsion',
-  setActiveCaeLoadCase: (c) => set({ activeCaeLoadCase: c }),
+  activeCaeLoadCase: 'battery_enclosure',
+  setActiveCaeLoadCase: (c) => set({ activeCaeLoadCase: c, caeState: 'SETUP', caeStep: 1, caeAnimationProgress: 0, caeProbeData: null }),
+  caeStep: 1,
+  setCaeStep: (step) => set({ caeStep: step }),
+  caeState: 'SETUP',
+  setCaeState: (st) => set({ caeState: st }),
+  caeAnimationProgress: 0,
+  setCaeAnimationProgress: (v) => set({ caeAnimationProgress: v }),
+  caeMetric: 'stress',
+  setCaeMetric: (m) => set({ caeMetric: m }),
+  caeDeformationScale: 10,
+  setCaeDeformationScale: (s) => set({ caeDeformationScale: s }),
+  caeProbeActive: false,
+  setCaeProbeActive: (v) => set({ caeProbeActive: v }),
+  caeProbeData: null,
+  setCaeProbeData: (data) => set({ caeProbeData: data }),
+  caeMeshView: false,
+  setCaeMeshView: (v) => set({ caeMeshView: v }),
+  caeMaterialColorView: false,
+  setCaeMaterialColorView: (v) => set({ caeMaterialColorView: v }),
+  compareRevisions: false,
+  setCompareRevisions: (v) => set({ compareRevisions: v }),
   activeTestRig: 'four_post',
   setActiveTestRig: (r) => set({ activeTestRig: r }),
   activeRoadSector: 'PG-04',

@@ -3,6 +3,7 @@ import { useStore } from '../store/useStore';
 import { INVESTIGATIONS, INVESTIGATION_STATES, EVENTS } from '../data/scenarios';
 import { Card, StatusChip, ProvTag, fmtTs } from '../ui/kit';
 import type { Investigation, InvestigationNote } from '../schema/types';
+import { PageHeader } from '../ui/PageHeader';
 
 const STATE_STYLE: Record<string, { dot: string; label: string; color: string }> = {
   DETECTED: { dot: 'dot-watch', label: 'Detected', color: 'var(--amber)' },
@@ -58,14 +59,11 @@ export function Investigations() {
   const stepIdx = active ? INVESTIGATION_STATES.indexOf(active.state) : -1;
 
   return (
-    <div className="col stack splash-fade" style={{ padding: 14, maxWidth: 1500 }}>
-      <div className="spread wrap">
-        <div>
-          <h2 className="h3" style={{ margin: 0 }}>Investigations</h2>
-          <div className="tiny muted">
-            Triage and track structural findings. Records here are DEMO — opened from EV-02/EV-04 sensor evidence and the fleet correlation.
-          </div>
-        </div>
+    <div className="col" style={{ width: '100%', minHeight: '100%', fontFamily: 'var(--font-sans)' }}>
+      <PageHeader
+        title="Engineering Investigations"
+        description="Triage, root-cause tracking, and structural finding resolution records across vehicle units."
+      >
         <div className="row wrap">
           {INVESTIGATION_STATES.map((st) => (
             <span key={st} className="chip" title={`${counts[st] ?? 0} investigation(s)`}>
@@ -74,7 +72,8 @@ export function Investigations() {
             </span>
           ))}
         </div>
-      </div>
+      </PageHeader>
+      <div className="col stack splash-fade" style={{ padding: 24 }}>
 
       <div className="grid2" style={{ alignItems: 'start' }}>
         {/* ---- list ---- */}
@@ -198,6 +197,7 @@ export function Investigations() {
           )}
         </Card>
       </div>
+    </div>
     </div>
   );
 }

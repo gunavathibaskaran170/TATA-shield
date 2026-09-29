@@ -52,8 +52,8 @@ export function WorkbenchGizmos() {
     }
   });
 
-  // Only render on workbench or twin pages
-  if (page !== 'workbench' && page !== 'digital_eng' && page !== 'twin') return null;
+  // Only render on workbench, validate, or twin pages
+  if (page !== 'workbench' && page !== 'controlled_val' && page !== 'digital_eng' && page !== 'twin') return null;
 
   return (
     <group name="workbench-load-gizmos">

@@ -5,6 +5,7 @@ import { CATALOG_BY_ID } from '../data/catalog';
 import { SENSOR_REGION_COMPONENTS } from '../dataflow/engine';
 import { Card, StatusChip, ProvTag, pct } from '../ui/kit';
 import type { HealthState, SensorLive } from '../schema/types';
+import { PageHeader } from '../ui/PageHeader';
 
 interface Finding {
   key: string;
@@ -80,16 +81,14 @@ export function AIDiagnostics() {
   const regionFlags = Object.values(regionStates).filter((r) => r.state !== 'NORMAL').length;
 
   return (
-    <div className="col stack splash-fade" style={{ padding: 14, maxWidth: 1500 }}>
-      <div className="spread wrap">
-        <div>
-          <h2 className="h3" style={{ margin: 0 }}>AI Diagnostics</h2>
-          <div className="tiny muted">
-            Explainable, rule-based suggestions from residual + persistence + quality. This is a transparent heuristic — <b>not</b> a trained ML model and not an FEA solver.
-          </div>
-        </div>
-        <span className="chip"><span className="dot dot-watch" /> {regionFlags} region(s) flagged · MODEL_ESTIMATED</span>
-      </div>
+    <div className="col" style={{ width: '100%', minHeight: '100%', fontFamily: 'var(--font-sans)' }}>
+      <PageHeader
+        title="AI Structural Diagnostics"
+        description="Explainable, rule-based diagnostic suggestions derived from residual, persistence, and signal quality metrics."
+      >
+        <span className="chip"><span className="dot dot-watch" /> {regionFlags} region(s) flagged</span>
+      </PageHeader>
+      <div className="col stack splash-fade" style={{ padding: 24 }}>
 
       <div className="grid2">
         {/* ---- worst-case explainer ---- */}
@@ -212,6 +211,7 @@ export function AIDiagnostics() {
           </div>
         </Card>
       </div>
+    </div>
     </div>
   );
 }

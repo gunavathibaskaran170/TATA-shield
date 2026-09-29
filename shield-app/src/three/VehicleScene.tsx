@@ -35,6 +35,7 @@ import { ShieldInstrumentBox } from './systems/ShieldBox';
 import { EXPLODE, ExplodedOverlays } from './ExplodedView';
 import { WorkbenchGizmos } from './WorkbenchGizmos';
 import { ProductionSuv } from './systems/ProductionSuv';
+import { CaeVisualizationGizmos } from './CaeVisualizationGizmos';
 
 /* ------------------------------------------------------------
    Camera presets (earth axes, +z forward) — demo camera moves.
@@ -466,6 +467,12 @@ export function VehicleScene() {
   const wireframeOpacity = useStore((s) => s.wireframeOpacity);
   const setWireframeOpacity = useStore((s) => s.setWireframeOpacity);
 
+  const page = useStore((s) => s.page);
+  const caeState = useStore((s) => s.caeState);
+  const caeAnimationProgress = useStore((s) => s.caeAnimationProgress);
+  const caeMetric = useStore((s) => s.caeMetric);
+  const caeDeformationScale = useStore((s) => s.caeDeformationScale);
+
   const isSkeletal = viewMode === 'skeletal';
   const glRenderer = useMemo(() => createRenderer, []);
 
@@ -543,6 +550,14 @@ export function VehicleScene() {
         {isSkeletal && (cadView && explode > 0.05 ? <ExplodedOverlays /> : <LoadPathArrows />)}
         {isSkeletal && <ClipGizmos />}
         <WorkbenchGizmos />
+        {page === 'digital_eng' && (
+          <CaeVisualizationGizmos
+            caeState={caeState}
+            animationProgress={caeAnimationProgress}
+            caeMetric={caeMetric}
+            deformationScale={caeDeformationScale}
+          />
+        )}
         <CameraRig />
         <FitRig />
       </Canvas>

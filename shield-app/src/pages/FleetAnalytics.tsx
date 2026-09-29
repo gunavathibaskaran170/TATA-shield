@@ -7,6 +7,7 @@ import { useStore } from '../store/useStore';
 import { FLEET_VEHICLES, FLEET_CORRELATIONS, MILEAGE_BANDS, mileageBandOf, INVESTIGATIONS } from '../data/scenarios';
 import { Card, StatusChip, Stat, fmtNum } from '../ui/kit';
 import type { FleetFilterKey, HealthState } from '../schema/types';
+import { PageHeader } from '../ui/PageHeader';
 
 const HEALTH_HEX: Record<HealthState, string> = {
   NORMAL: '#4fe0a0', WATCH: '#f2b94e', INSPECTION_REQUIRED: '#ff6b5e',
@@ -68,17 +69,15 @@ export function FleetAnalytics() {
   ].sort();
 
   return (
-    <div className="col stack splash-fade" style={{ padding: 14, maxWidth: 1500 }}>
-      <div className="spread wrap">
-        <div>
-          <h2 className="h3" style={{ margin: 0 }}>Fleet Analytics</h2>
-          <div className="tiny muted">Synthetic 36-unit fleet (DEMO) — correlation is pattern-finding, never a defect claim without engineering review.</div>
-        </div>
-        <div className="row wrap">
-          <span className="chip st-normal"><span className="dot dot-normal" /> {filtered.length}/{FLEET_VEHICLES.length} shown</span>
-          <button className="btn" onClick={resetFleetFilters}>Reset filters</button>
-        </div>
-      </div>
+    <div className="col" style={{ width: '100%', minHeight: '100%', fontFamily: 'var(--font-sans)' }}>
+      <PageHeader
+        title="Fleet Structural Analytics"
+        description="Cross-vehicle statistical degradation patterns, mileage correlations, and fleet-wide anomaly distribution."
+      >
+        <span className="chip st-normal"><span className="dot dot-normal" /> {filtered.length}/{FLEET_VEHICLES.length} shown</span>
+        <button className="btn" onClick={resetFleetFilters}>Reset filters</button>
+      </PageHeader>
+      <div className="col stack splash-fade" style={{ padding: 24 }}>
 
       {/* correlation banner */}
       <Card title="Fleet correlations (statistical, DEMO)">
@@ -256,6 +255,7 @@ export function FleetAnalytics() {
           ))}
         </div>
       </Card>
+    </div>
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { Timeline } from '../ui/Timeline';
 import { EVENTS, TIMELINE_PHASES, phaseAt } from '../data/scenarios';
 import { SENSOR_BY_ID } from '../data/sensors';
 import { Card, StatusChip, ProvTag, pct } from '../ui/kit';
+import { PageHeader } from '../ui/PageHeader';
 
 export function EventForensics() {
   const tlTime = useStore((s) => s.tlTime);
@@ -12,16 +13,14 @@ export function EventForensics() {
   const ph = phaseAt(tlTime);
 
   return (
-    <div className="col stack splash-fade" style={{ padding: 14, maxWidth: 1500 }}>
-      <div className="spread wrap">
-        <div>
-          <h2 className="h3" style={{ margin: 0 }}>Event Forensics</h2>
-          <div className="tiny muted">
-            Scroll the 30 s replay — the mock telemetry stream re-enacts each event so live readings reflect the selected window.
-          </div>
-        </div>
+    <div className="col" style={{ width: '100%', minHeight: '100%', fontFamily: 'var(--font-sans)' }}>
+      <PageHeader
+        title="Event Forensics Replay"
+        description="High-resolution synchronous event timeline capture, phase playback, and structural response correlation."
+      >
         <span className="chip"><span className="dot dot-watch" /> phase: <b style={{ color: 'var(--cyan)' }}>{ph}</b> · t = {tlTime.toFixed(1)}s</span>
-      </div>
+      </PageHeader>
+      <div className="col stack splash-fade" style={{ padding: 24 }}>
 
       <Timeline />
 
@@ -155,6 +154,7 @@ export function EventForensics() {
           <ProvTag p="SIMULATED" />
         </div>
       </Card>
+    </div>
     </div>
   );
 }

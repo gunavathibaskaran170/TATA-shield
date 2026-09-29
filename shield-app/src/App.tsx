@@ -57,13 +57,14 @@ const PAGES: Record<PageKey, ComponentType> = {
 };
 
 const MOBILE_NAV: { key: PageKey; label: string }[] = [
-  { key: 'command', label: 'Home' },
-  { key: 'twin', label: 'Twin' },
-  { key: 'telemetry', label: 'Sensors' },
-  { key: 'fleet', label: 'Fleet' },
-  { key: 'forensics', label: 'Events' },
-  { key: 'investigations', label: 'Cases' },
-  { key: 'settings', label: 'Settings' },
+  { key: 'command', label: 'Command' },
+  { key: 'digital_eng', label: '01 DESIGN' },
+  { key: 'mfg_quality', label: '02 BUILD' },
+  { key: 'controlled_val', label: '03 VALIDATE' },
+  { key: 'live_twin', label: '04 MONITOR' },
+  { key: 'workbench', label: 'Workbench' },
+  { key: 'hardware', label: 'Hardware' },
+  { key: 'passport', label: 'Passport' },
 ];
 
 export function App() {

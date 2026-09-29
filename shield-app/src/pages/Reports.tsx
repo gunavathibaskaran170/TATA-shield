@@ -5,6 +5,7 @@ import { SENSORS } from '../data/sensors';
 import { ALL_FASTENERS } from '../data/fasteners';
 import { Card, StatusChip, ProvTag, fmtTs, EmptyState } from '../ui/kit';
 import type { SensorStatus } from '../schema/types';
+import { PageHeader } from '../ui/PageHeader';
 
 interface ReportRow {
   sensorId: string;
@@ -123,22 +124,19 @@ export function Reports() {
   const ext = fmt === 'csv' ? 'csv' : fmt === 'md' ? 'md' : 'json';
 
   return (
-    <div className="col stack splash-fade" style={{ padding: 14, maxWidth: 1500 }}>
-      <div className="spread wrap">
-        <div>
-          <h2 className="h3" style={{ margin: 0 }}>Reports</h2>
-          <div className="tiny muted">
-            Export engineering summaries from the current twin state. Every report is stamped DEMO — review before sharing.
-          </div>
-        </div>
-        <div className="row wrap">
-          <span className="chip"><span className="dot dot-normal" /> {report.id}</span>
-          <button className="btn" onClick={() => setGen((g) => g + 1)} title="Re-read current twin state">⟳ Refresh</button>
-          <button className="btn accent" onClick={() => download(`shield-report-${report.vehicleId}.${ext}`, fmt === 'csv' ? toCsv(report) : fmt === 'md' ? toMarkdown(report) : JSON.stringify(report, null, 2), fmt === 'csv' ? 'text/csv' : fmt === 'md' ? 'text/markdown' : 'application/json')}>
-            ⬇ Export {ext.toUpperCase()}
-          </button>
-        </div>
-      </div>
+    <div className="col" style={{ width: '100%', minHeight: '100%', fontFamily: 'var(--font-sans)' }}>
+      <PageHeader
+        title="Event History & Export Records"
+        description="Export engineering summaries and data logs from the active vehicle digital twin."
+        badge={report.id}
+        badgeType="default"
+      >
+        <button className="btn" onClick={() => setGen((g) => g + 1)} title="Re-read current twin state">⟳ Refresh</button>
+        <button className="btn accent" onClick={() => download(`shield-report-${report.vehicleId}.${ext}`, fmt === 'csv' ? toCsv(report) : fmt === 'md' ? toMarkdown(report) : JSON.stringify(report, null, 2), fmt === 'csv' ? 'text/csv' : fmt === 'md' ? 'text/markdown' : 'application/json')}>
+          ⬇ Export {ext.toUpperCase()}
+        </button>
+      </PageHeader>
+      <div className="col stack splash-fade" style={{ padding: 24 }}>
 
       <div className="row wrap">
         {(['overview', 'json', 'csv', 'md'] as const).map((f) => (
@@ -241,6 +239,7 @@ export function Reports() {
           <pre className="mono" style={{ fontSize: 11, maxHeight: 520, overflow: 'auto', color: 'var(--text)', lineHeight: 1.6 }}>{toMarkdown(report)}</pre>
         </Card>
       )}
+    </div>
     </div>
   );
 }

@@ -12,6 +12,7 @@ import type { ViewPreset } from '../store/useStore';
 import type { BatteryViewMode } from '../store/useStore';
 import { ErrorBoundary } from '../ui/ErrorBoundary';
 import { InteractiveCadFallback } from '../three/InteractiveCadFallback';
+import { PageHeader } from '../ui/PageHeader';
 
 const CAM_PRESETS: { key: ViewPreset; label: string }[] = [
   { key: 'iso', label: 'Iso' },
@@ -235,10 +236,18 @@ export function VehicleTwin() {
   const requestZoomIn = useStore((s) => s.requestZoomIn);
   const requestZoomOut = useStore((s) => s.requestZoomOut);
   const requestFitCamera = useStore((s) => s.requestFitCamera);
+  const vehicleId = useStore((s) => s.vehicleId);
 
   return (
-    <div className="col" style={{ height: '100%', padding: 8, gap: 8, minWidth: 0 }}>
-      <TwinToolbar />
+    <div className="col" style={{ height: '100%', minWidth: 0, overflow: 'hidden' }}>
+      <PageHeader
+        title="3D Vehicle Digital Twin"
+        description="Interactive 3D vehicle structural model & real-time telemetry component inspector."
+        badge={vehicleId}
+        badgeType="default"
+      />
+      <div className="col" style={{ flex: 1, padding: 8, gap: 8, minWidth: 0, overflow: 'auto' }}>
+        <TwinToolbar />
 
       <div className="row" style={{ flex: 1, minHeight: 0, alignItems: 'stretch', gap: 8 }}>
         {/* centre: 3D + timeline */}
@@ -330,6 +339,7 @@ export function VehicleTwin() {
           <button className="btn" onClick={() => navigate('passport')}>Passport</button>
         </div>
       </div>
+    </div>
     </div>
   );
 }

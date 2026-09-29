@@ -4,6 +4,7 @@ import { CATALOG_BY_ID } from '../data/catalog';
 import { SENSOR_REGION_COMPONENTS } from '../dataflow/engine';
 import { Card, StatusChip, ProvTag, pct } from '../ui/kit';
 import { HeatmapControls, HeatmapLegend } from '../ui/HeatmapLegend';
+import { PageHeader } from '../ui/PageHeader';
 
 export function StructuralIntelligence() {
   const sensorLive = useStore((s) => s.sensorLive);
@@ -25,14 +26,14 @@ export function StructuralIntelligence() {
   const maxHeat = Math.max(0.01, ...Object.values(heatValues));
 
   return (
-    <div className="col stack splash-fade" style={{ padding: 14, maxWidth: 1500 }}>
-      <div className="spread wrap">
-        <div>
-          <h2 className="h3" style={{ margin: 0 }}>Structural Intelligence</h2>
-          <div className="tiny muted">Region states are derived in-app from the sensor stream via residual → persistence → anomaly. All values are MODEL_ESTIMATED.</div>
-        </div>
+    <div className="col" style={{ width: '100%', minHeight: '100%', fontFamily: 'var(--font-sans)' }}>
+      <PageHeader
+        title="Structural Intelligence"
+        description="Region anomaly states derived from live telemetry stream via residual persistence analysis."
+      >
         <HeatmapControls />
-      </div>
+      </PageHeader>
+      <div className="col stack splash-fade" style={{ padding: 24 }}>
 
       <div className="grid2">
         <Card title={
@@ -139,6 +140,7 @@ export function StructuralIntelligence() {
           <button className="btn" onClick={() => setHeatmapMode('off')}>Heatmap off</button>
         </div>
       </Card>
+    </div>
     </div>
   );
 }

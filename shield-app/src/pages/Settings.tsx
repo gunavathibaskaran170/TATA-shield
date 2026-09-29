@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useStore } from '../store/useStore';
 import { SENSORS } from '../data/sensors';
 import { Card, ProvTag, Toggle, SliderRow } from '../ui/kit';
+import { PageHeader } from '../ui/PageHeader';
 
 const SOURCES = [
   {
@@ -37,16 +38,14 @@ export function Settings() {
   const [showHiddenStats, setShowHiddenStats] = useState(true);
 
   return (
-    <div className="col stack splash-fade" style={{ padding: 14, maxWidth: 1500 }}>
-      <div className="spread wrap">
-        <div>
-          <h2 className="h3" style={{ margin: 0 }}>Settings & Data Sources</h2>
-          <div className="tiny muted">
-            The UI never cares where telemetry comes from — swap adapters, keep the contract.
-          </div>
-        </div>
-        <ProvTag p="DEMO" />
-      </div>
+    <div className="col" style={{ width: '100%', minHeight: '100%', fontFamily: 'var(--font-sans)' }}>
+      <PageHeader
+        title="Settings & Data Sources"
+        description="Configure stream adapter contracts, simulation parameters, and display preferences."
+      >
+        <span className="chip"><span className="dot dot-normal" /> adapter: <b>{source}</b></span>
+      </PageHeader>
+      <div className="col stack splash-fade" style={{ padding: 24 }}>
 
       <div className="grid2">
         {/* ---- data source ---- */}
@@ -173,6 +172,7 @@ export function Settings() {
           </div>
         </div>
       </Card>
+    </div>
     </div>
   );
 }

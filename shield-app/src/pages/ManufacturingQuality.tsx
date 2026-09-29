@@ -1,35 +1,38 @@
 /* ============================================================
-   SHIELD — MODULE 02: MANUFACTURING QUALITY & METROLOGY CELL
-   Industrial quality inspection cell featuring:
-   - Digital Nominal CAD vs As-Built Laser Metrology
-   - 24-Point Coordinate Datum Inspection (B01..B24)
-   - 3D Deviation Vectors & Tolerance Heatmaps
-   - Weld & Structural Joint Quality Inspection Matrix
-   - Digital Build Genealogy Record
+   SHIELD — STAGE 02: BUILD & MANUFACTURING BASELINE WORKSTATION
+   Strict 3-Column Professional Engineering Workspace Layout
+   - Row 1: Single Top Global Navigation (handled by App Shell TopBar)
+   - Row 2: Page Header & Toolbar with Dark Navy Heading (#101820)
+   - Row 3: Grid (300px Left Collapsible Panel | Flexible Viewport | 280px Right Result Panel)
+   - 4 Major Steps: 01 Dimensional Check, 02 Joint Check, 03 Baseline Capture, 04 Build Decision
+   - Row 4: Thin 42px Viewport Toolbar (Nominal | As-Built | Deviation)
    ============================================================ */
 
 import { useState } from 'react';
 import { useStore } from '../store/useStore';
 import { VehicleScene } from '../three/VehicleScene';
 import { METROLOGY_DATUM_POINTS, BATTERY_MOUNTS } from '../data/engineering';
-import type { MetrologyDatumPoint } from '../schema/types';
-import { FASTENER_GROUPS, ALL_FASTENERS } from '../data/fasteners';
-import { Card, Stat, ProvTag } from '../ui/kit';
+import { PageHeader } from '../ui/PageHeader';
 
 export function ManufacturingQuality() {
   const selectedDatumPoint = useStore((s) => s.selectedDatumPoint);
   const setSelectedDatumPoint = useStore((s) => s.setSelectedDatumPoint);
+  const viewMode = useStore((s) => s.viewMode);
   const setViewMode = useStore((s) => s.setViewMode);
-  const setCadView = useStore((s) => s.setCadView);
+  const requestResetCamera = useStore((s) => s.requestResetCamera);
   const vehicleId = useStore((s) => s.vehicleId);
-  const navigate = useStore((s) => s.navigate);
+  const wireframeOpacity = useStore((s) => s.wireframeOpacity);
+  const setWireframeOpacity = useStore((s) => s.setWireframeOpacity);
 
+  // Layout & Panel Collapse State
+  const [leftCollapsed, setLeftCollapsed] = useState<boolean>(false);
+  const [rightCollapsed, setRightCollapsed] = useState<boolean>(false);
+  const [mfgStep, setMfgStep] = useState<1 | 2 | 3 | 4>(1);
   const [inspectionMode, setInspectionMode] = useState<'nominal' | 'as_built' | 'deviation'>('deviation');
-  const [activeCategory, setActiveCategory] = useState<'metrology' | 'joints' | 'genealogy'>('metrology');
   const [filterRegion, setFilterRegion] = useState<string>('ALL');
+  const [baselineFrozen, setBaselineFrozen] = useState<boolean>(false);
 
-  const selectedPoint = METROLOGY_DATUM_POINTS.find((p) => p.id === selectedDatumPoint) ?? METROLOGY_DATUM_POINTS[16]; // Default B17
-
+  const selectedPoint = METROLOGY_DATUM_POINTS.find((p) => p.id === selectedDatumPoint) ?? METROLOGY_DATUM_POINTS[0];
   const regions = ['ALL', ...new Set(METROLOGY_DATUM_POINTS.map((p) => p.region))];
   const filteredPoints = filterRegion === 'ALL'
     ? METROLOGY_DATUM_POINTS
@@ -38,424 +41,396 @@ export function ManufacturingQuality() {
   const totalPoints = METROLOGY_DATUM_POINTS.length;
   const acceptedPoints = METROLOGY_DATUM_POINTS.filter((p) => p.status === 'ACCEPT').length;
   const maxDev = Math.max(...METROLOGY_DATUM_POINTS.map((p) => p.deviationMm));
-  const avgDev = METROLOGY_DATUM_POINTS.reduce((acc, p) => acc + p.deviationMm, 0) / totalPoints;
+
+  const handleLocatePoint = (id: string) => {
+    setSelectedDatumPoint(id);
+    requestResetCamera();
+  };
 
   return (
-    <div className="mfg-quality-layout" style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-      {/* 3D Metrology Scene */}
-      <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
-        <VehicleScene />
-      </div>
-
-      {/* Top Header Ribbon */}
-      <div
-        style={{
-          position: 'relative',
-          zIndex: 2,
-          padding: '10px 16px',
-          background: 'linear-gradient(180deg, rgba(12,16,21,0.92) 0%, rgba(12,16,21,0.6) 75%, transparent 100%)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 12,
-          flexWrap: 'wrap',
-          pointerEvents: 'auto',
-        }}
+    <div
+      className="mfg-quality-layout"
+      style={{
+        position: 'relative',
+        width: '100%',
+        height: '100%',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        background: '#E8EDF3',
+        color: '#101820',
+        fontFamily: 'var(--sans)',
+      }}
+    >
+      {/* ============================================================
+          ROW 2 — PAGE HEADER / TOOLBAR (SOLID LIGHT BG, DARK NAVY HEADING)
+          ============================================================ */}
+      <PageHeader
+        title="02 Build & Baseline"
+        description='"Was the vehicle built according to the released design?"'
+        badge="CMM METROLOGY"
+        badgeType="success"
       >
-        <div className="row" style={{ gap: 12 }}>
-          <div
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 12, fontWeight: 500, color: '#94A3B8' }}>DATA SOURCE:</span>
+          <select
             style={{
-              width: 32,
-              height: 32,
+              fontSize: 13,
+              fontWeight: 600,
+              padding: '6px 10px',
               borderRadius: 6,
-              background: 'linear-gradient(135deg, #065f46, #064e3b)',
-              border: '1px solid #10b981',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#34d399',
-              fontWeight: 800,
-              fontSize: 14,
+              background: '#141b24',
+              border: '1px solid #273342',
+              color: '#F8FAFC',
+              cursor: 'pointer',
+              fontFamily: 'var(--font-sans)',
             }}
           >
-            02
-          </div>
-          <div>
-            <div className="row" style={{ gap: 8 }}>
-              <span style={{ fontWeight: 700, fontSize: 14, letterSpacing: '0.04em', color: '#f8fafc' }}>
-                MANUFACTURING QUALITY & LASER METROLOGY CELL
-              </span>
-              <span className="prov prov-verified">CMM LASER SCAN</span>
-              <span className="prov prov-verified">OPTICAL METROLOGY</span>
-            </div>
-            <div className="tiny faint" style={{ marginTop: 2 }}>
-              Digital Nominal CAD vs As-Built Dimensional Verification · Tolerance Range ±0.80 mm
-            </div>
-          </div>
+            <option value="factory">Engineering Stream (CMM Cell 04)</option>
+          </select>
         </div>
 
-        {/* Metrology Mode Switcher */}
-        <div className="row wrap" style={{ gap: 6 }}>
-          {(['nominal', 'as_built', 'deviation'] as const).map((mode) => {
-            const active = inspectionMode === mode;
-            const label = mode === 'nominal' ? 'Digital Nominal CAD' : mode === 'as_built' ? 'As-Built Scan' : 'Deviation Heatmap';
-            return (
-              <button
-                key={mode}
-                className={`btn ${active ? 'active' : ''}`}
-                onClick={() => setInspectionMode(mode)}
-                style={{
-                  background: active ? '#059669' : undefined,
-                  borderColor: active ? '#10b981' : undefined,
-                  color: active ? '#fff' : undefined,
-                  fontSize: 12,
-                }}
-              >
-                {label}
-              </button>
-            );
-          })}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 12, fontWeight: 500, color: '#94A3B8' }}>VIEW:</span>
+          <select
+            value={viewMode}
+            onChange={(e) => setViewMode(e.target.value as any)}
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              padding: '6px 10px',
+              borderRadius: 6,
+              background: '#141b24',
+              border: '1px solid #273342',
+              color: '#F8FAFC',
+              cursor: 'pointer',
+              fontFamily: 'var(--font-sans)',
+            }}
+          >
+            <option value="chassis">Complete Vehicle / Chassis</option>
+            <option value="skeletal">Skeletal Frame Only</option>
+            <option value="body">Full Exterior Body</option>
+          </select>
         </div>
-      </div>
 
-      {/* Floating Left Panel — Metrology Datum Points & Joint Quality */}
+        <button
+          onClick={() => requestResetCamera()}
+          style={{
+            fontSize: 13,
+            fontWeight: 600,
+            padding: '6px 12px',
+            borderRadius: 6,
+            background: '#141b24',
+            border: '1px solid #273342',
+            color: '#F8FAFC',
+            cursor: 'pointer',
+            fontFamily: 'var(--font-sans)',
+          }}
+        >
+          ⟳ Reset View
+        </button>
+      </PageHeader>
+
+      {/* ============================================================
+          ROW 3 — MAIN WORKSPACE GRID (300px LEFT | FLEX VIEWPORT | 280px RIGHT)
+          ============================================================ */}
       <div
         style={{
-          position: 'absolute',
-          top: 64,
-          left: 14,
-          bottom: 14,
-          width: 400,
-          zIndex: 3,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 10,
-          pointerEvents: 'auto',
+          flex: 1,
+          display: 'grid',
+          gridTemplateColumns: `${leftCollapsed ? '48px' : '300px'} minmax(0, 1fr) ${rightCollapsed ? '0px' : '280px'}`,
+          overflow: 'hidden',
+          position: 'relative',
+          transition: 'grid-template-columns 0.2s ease',
         }}
       >
+        {/* ------------------------------------------------------------
+            LEFT CONTROL PANEL (300px / 48px COLLAPSED)
+            ------------------------------------------------------------ */}
         <div
-          className="panel"
           style={{
-            padding: 12,
-            background: 'rgba(12, 16, 21, 0.88)',
-            backdropFilter: 'blur(12px)',
-            border: '1px solid rgba(16, 185, 129, 0.25)',
+            background: '#111A24',
+            borderRight: '1px solid #1E293B',
             display: 'flex',
             flexDirection: 'column',
-            gap: 10,
-            flex: 1,
-            overflow: 'hidden',
+            overflowY: 'auto',
+            zIndex: 5,
+            color: '#E2E8F0',
+            fontFamily: 'var(--mono)',
+            padding: leftCollapsed ? 8 : 12,
+            gap: 12,
           }}
         >
-          {/* Sub Tabs */}
-          <div className="row" style={{ background: 'var(--bg2)', padding: 3, borderRadius: 6, gap: 4 }}>
+          {/* HEADER & COLLAPSE BUTTON */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: leftCollapsed ? 'center' : 'space-between', borderBottom: '1px solid #1E293B', paddingBottom: leftCollapsed ? 4 : 8 }}>
+            {!leftCollapsed && <span style={{ fontWeight: 800, fontSize: 12, color: '#16A36A', letterSpacing: '0.05em' }}>MANUFACTURING CHECK</span>}
             <button
-              style={{
-                flex: 1,
-                padding: '6px 4px',
-                fontSize: 11,
-                fontWeight: 600,
-                borderRadius: 4,
-                border: 'none',
-                background: activeCategory === 'metrology' ? '#059669' : 'transparent',
-                color: activeCategory === 'metrology' ? '#fff' : 'var(--muted)',
-                cursor: 'pointer',
-              }}
-              onClick={() => setActiveCategory('metrology')}
+              onClick={() => setLeftCollapsed(!leftCollapsed)}
+              style={{ background: 'transparent', border: 'none', color: '#38BDF8', fontSize: 14, cursor: 'pointer' }}
+              title={leftCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
             >
-              Datum Metrology (24)
-            </button>
-            <button
-              style={{
-                flex: 1,
-                padding: '6px 4px',
-                fontSize: 11,
-                fontWeight: 600,
-                borderRadius: 4,
-                border: 'none',
-                background: activeCategory === 'joints' ? '#059669' : 'transparent',
-                color: activeCategory === 'joints' ? '#fff' : 'var(--muted)',
-                cursor: 'pointer',
-              }}
-              onClick={() => setActiveCategory('joints')}
-            >
-              Joint Quality
-            </button>
-            <button
-              style={{
-                flex: 1,
-                padding: '6px 4px',
-                fontSize: 11,
-                fontWeight: 600,
-                borderRadius: 4,
-                border: 'none',
-                background: activeCategory === 'genealogy' ? '#059669' : 'transparent',
-                color: activeCategory === 'genealogy' ? '#fff' : 'var(--muted)',
-                cursor: 'pointer',
-              }}
-              onClick={() => setActiveCategory('genealogy')}
-            >
-              Build Genealogy
+              ☰
             </button>
           </div>
 
-          {/* TAB 1: DATUM METROLOGY */}
-          {activeCategory === 'metrology' && (
-            <div className="col" style={{ flex: 1, overflow: 'hidden', gap: 10 }}>
-              {/* Region Filter */}
-              <div className="row wrap" style={{ gap: 4 }}>
-                {regions.map((r) => (
-                  <button
-                    key={r}
-                    onClick={() => setFilterRegion(r)}
-                    style={{
-                      padding: '3px 7px',
-                      fontSize: 10,
-                      borderRadius: 4,
-                      border: filterRegion === r ? '1px solid #10b981' : '1px solid var(--line)',
-                      background: filterRegion === r ? 'rgba(16,185,129,0.15)' : 'transparent',
-                      color: filterRegion === r ? '#34d399' : 'var(--muted)',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {r}
-                  </button>
-                ))}
-              </div>
+          {!leftCollapsed && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              
+              {/* STEP 1: DIMENSIONAL CHECK */}
+              <div style={{ background: '#070B11', borderRadius: 8, border: mfgStep === 1 ? '1px solid #16A36A' : '1px solid #1E293B', overflow: 'hidden' }}>
+                <button
+                  onClick={() => setMfgStep(1)}
+                  style={{ width: '100%', padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: mfgStep === 1 ? 'rgba(22,163,106,0.15)' : 'transparent', border: 'none', cursor: 'pointer', color: '#F8FAFC' }}
+                >
+                  <span style={{ fontSize: 12, fontWeight: 800 }}>✓ 01 DIMENSIONAL CHECK</span>
+                  <span style={{ fontSize: 10, color: '#16A36A', fontWeight: 700 }}>24/24 Datums</span>
+                </button>
+                {mfgStep === 1 && (
+                  <div style={{ padding: 10, borderTop: '1px solid #1E293B', fontSize: 11, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <span style={{ fontSize: 10, color: '#94A3B8' }}>REGION FILTER:</span>
+                      <select
+                        value={filterRegion}
+                        onChange={(e) => setFilterRegion(e.target.value)}
+                        style={{ background: '#0F172A', color: '#F8FAFC', border: '1px solid #334155', padding: 4, borderRadius: 4, fontSize: 11 }}
+                      >
+                        {regions.map((r) => <option key={r} value={r}>{r}</option>)}
+                      </select>
+                    </div>
 
-              {/* Datum List */}
-              <div className="col" style={{ flex: 1, overflowY: 'auto', gap: 4, paddingRight: 4 }}>
-                {filteredPoints.map((p) => {
-                  const isSelected = p.id === selectedPoint.id;
-                  const devRatio = p.deviationMm / p.toleranceMm;
-                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <span style={{ fontSize: 10, color: '#94A3B8' }}>MEASUREMENT POINT:</span>
+                      <select
+                        value={selectedPoint.id}
+                        onChange={(e) => setSelectedDatumPoint(e.target.value)}
+                        style={{ background: '#0F172A', color: '#38BDF8', border: '1px solid #334155', padding: 4, borderRadius: 4, fontSize: 11, fontWeight: 700 }}
+                      >
+                        {filteredPoints.map((p) => (
+                          <option key={p.id} value={p.id}>{p.id} — {p.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div style={{ background: '#0D1724', padding: 8, borderRadius: 6, border: '1px solid #1E293B', display: 'flex', flexDirection: 'column', gap: 4, fontSize: 10.5 }}>
+                      <div>Nominal: <strong style={{ color: '#F8FAFC' }}>{selectedPoint.nominal.map(v => (v / 1000).toFixed(2)).join(', ')} m</strong></div>
+                      <div>Measured: <strong style={{ color: '#38BDF8' }}>{selectedPoint.measured.map(v => (v / 1000).toFixed(4)).join(', ')} m</strong></div>
+                      <div>Deviation: <strong style={{ color: selectedPoint.deviationMm > selectedPoint.toleranceMm ? '#F4A62A' : '#16A36A' }}>+{selectedPoint.deviationMm.toFixed(2)} mm</strong></div>
+                      <div>Tolerance: <strong style={{ color: '#94A3B8' }}>±{selectedPoint.toleranceMm.toFixed(2)} mm</strong></div>
+                      <div>Status: <span style={{ fontWeight: 800, color: selectedPoint.status === 'ACCEPT' ? '#16A36A' : '#D83B3B' }}>{selectedPoint.status}</span></div>
+                    </div>
+
                     <button
-                      key={p.id}
-                      onClick={() => setSelectedDatumPoint(p.id)}
-                      style={{
-                        textAlign: 'left',
-                        padding: '6px 8px',
-                        borderRadius: 5,
-                        cursor: 'pointer',
-                        background: isSelected ? 'linear-gradient(90deg, #064e3b, #0f172a)' : 'rgba(255,255,255,0.02)',
-                        border: isSelected ? '1px solid #10b981' : '1px solid var(--line)',
-                        color: isSelected ? '#34d399' : 'var(--text)',
-                      }}
+                      onClick={() => handleLocatePoint(selectedPoint.id)}
+                      style={{ width: '100%', padding: '6px', borderRadius: 6, background: '#00A6D6', color: '#FFF', fontWeight: 800, border: 'none', cursor: 'pointer', fontSize: 11 }}
                     >
-                      <div className="spread">
-                        <span className="mono" style={{ fontWeight: 700, fontSize: 12 }}>{p.id} — {p.name}</span>
-                        <span
-                          className="chip tiny"
-                          style={{
-                            color: devRatio > 0.8 ? 'var(--amber)' : '#34d399',
-                            borderColor: devRatio > 0.8 ? 'rgba(245,158,11,0.3)' : 'rgba(16,185,129,0.3)',
-                          }}
-                        >
-                          {p.status}
-                        </span>
-                      </div>
-                      <div className="spread" style={{ marginTop: 2, fontSize: 11 }}>
-                        <span className="faint">{p.region}</span>
-                        <span className="mono" style={{ color: devRatio > 0.8 ? 'var(--amber)' : 'var(--cyan)' }}>
-                          Δ {p.deviationMm > 0 ? `+${p.deviationMm.toFixed(2)}` : p.deviationMm.toFixed(2)} mm (Tol ±{p.toleranceMm} mm)
-                        </span>
-                      </div>
+                      🎯 LOCATE ON VEHICLE
                     </button>
-                  );
-                })}
+                  </div>
+                )}
               </div>
 
-              {/* Metrology Statistics Banner */}
-              <div className="grid3" style={{ gap: 6 }}>
-                <Stat label="Inspected" value={`${acceptedPoints}/${totalPoints}`} sub="100% Passed" accent="var(--green)" />
-                <Stat label="Avg Deviation" value={`+${avgDev.toFixed(2)} mm`} sub="Mean absolute" />
-                <Stat label="Max Deviation" value={`+${maxDev.toFixed(2)} mm`} sub="Point B18" accent="var(--cyan)" />
+              {/* STEP 2: JOINT & ASSEMBLY CHECK */}
+              <div style={{ background: '#070B11', borderRadius: 8, border: mfgStep === 2 ? '1px solid #16A36A' : '1px solid #1E293B', overflow: 'hidden' }}>
+                <button
+                  onClick={() => setMfgStep(2)}
+                  style={{ width: '100%', padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: mfgStep === 2 ? 'rgba(22,163,106,0.15)' : 'transparent', border: 'none', cursor: 'pointer', color: '#F8FAFC' }}
+                >
+                  <span style={{ fontSize: 12, fontWeight: 800 }}>✓ 02 JOINT & ASSEMBLY CHECK</span>
+                  <span style={{ fontSize: 10, color: '#16A36A', fontWeight: 700 }}>6/6 Mounts</span>
+                </button>
+                {mfgStep === 2 && (
+                  <div style={{ padding: 10, borderTop: '1px solid #1E293B', fontSize: 10.5, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {BATTERY_MOUNTS.map((m) => (
+                      <div key={m.id} style={{ background: '#0D1724', padding: 6, borderRadius: 6, border: '1px solid #1E293B', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: '#38BDF8' }}>
+                          <span>{m.id} ({m.location})</span>
+                          <span style={{ color: m.status === 'ACCEPT' ? '#16A36A' : '#F4A62A' }}>{m.status}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#94A3B8', fontSize: 10 }}>
+                          <span>Torque: {m.measuredTorqueNm} Nm</span>
+                          <span>Preload: {m.preloadKn} kN</span>
+                          <span style={{ color: '#16A36A' }}>{m.ultrasonicIntegrityPct}%</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
-          )}
 
-          {/* TAB 2: JOINT QUALITY */}
-          {activeCategory === 'joints' && (
-            <div className="col" style={{ flex: 1, overflowY: 'auto', gap: 10 }}>
-              <div className="tiny faint" style={{ textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                Battery Pack 6-Point Bolted Interface
+              {/* STEP 3: BASELINE CAPTURE */}
+              <div style={{ background: '#070B11', borderRadius: 8, border: mfgStep === 3 ? '1px solid #16A36A' : '1px solid #1E293B', overflow: 'hidden' }}>
+                <button
+                  onClick={() => setMfgStep(3)}
+                  style={{ width: '100%', padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: mfgStep === 3 ? 'rgba(22,163,106,0.15)' : 'transparent', border: 'none', cursor: 'pointer', color: '#F8FAFC' }}
+                >
+                  <span style={{ fontSize: 12, fontWeight: 800 }}>✓ 03 BASELINE CAPTURE</span>
+                  <span style={{ fontSize: 10, color: baselineFrozen ? '#16A36A' : '#F4A62A', fontWeight: 700 }}>{baselineFrozen ? 'FROZEN' : 'READY'}</span>
+                </button>
+                {mfgStep === 3 && (
+                  <div style={{ padding: 10, borderTop: '1px solid #1E293B', fontSize: 10.5, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Geometry Baseline:</span><strong style={{ color: '#16A36A' }}>24 Datums Locked</strong></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Joint Baseline:</span><strong style={{ color: '#16A36A' }}>6 Mounts Verified</strong></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Structural Reference:</span><strong style={{ color: '#38BDF8' }}>Zero Tare Fixed</strong></div>
+                    
+                    <button
+                      onClick={() => setBaselineFrozen(true)}
+                      style={{ width: '100%', padding: '8px', borderRadius: 6, background: baselineFrozen ? '#059669' : '#00A6D6', color: '#FFF', fontWeight: 800, border: 'none', cursor: 'pointer', marginTop: 4 }}
+                    >
+                      {baselineFrozen ? '✓ BASELINE A CAPTURED' : '🔒 FREEZE MANUFACTURING BASELINE'}
+                    </button>
+                  </div>
+                )}
               </div>
-              <div className="col" style={{ gap: 6 }}>
-                {BATTERY_MOUNTS.map((m) => (
-                  <div key={m.id} className="panel" style={{ padding: 8, background: 'rgba(0,0,0,0.25)', border: '1px solid var(--line)' }}>
-                    <div className="spread">
-                      <span className="mono" style={{ fontWeight: 700, fontSize: 12, color: '#38bdf8' }}>{m.id} ({m.location})</span>
-                      <span className="chip tiny" style={{ color: m.status === 'ACCEPT' ? 'var(--green)' : 'var(--amber)' }}>
-                        {m.status}
-                      </span>
-                    </div>
-                    <div className="tiny faint" style={{ marginTop: 2 }}>{m.fastenerSpec}</div>
-                    <div className="grid3" style={{ marginTop: 6, gap: 4 }}>
-                      <div className="stat" style={{ padding: '3px 4px' }}>
-                        <span className="tiny faint">Torque</span>
-                        <span className="mono tiny" style={{ fontWeight: 600 }}>{m.measuredTorqueNm} Nm</span>
-                      </div>
-                      <div className="stat" style={{ padding: '3px 4px' }}>
-                        <span className="tiny faint">Preload</span>
-                        <span className="mono tiny" style={{ fontWeight: 600 }}>{m.preloadKn} kN</span>
-                      </div>
-                      <div className="stat" style={{ padding: '3px 4px' }}>
-                        <span className="tiny faint">Ultrasonic</span>
-                        <span className="mono tiny" style={{ fontWeight: 600, color: 'var(--green)' }}>{m.ultrasonicIntegrityPct}%</span>
-                      </div>
+
+              {/* STEP 4: BUILD DECISION */}
+              <div style={{ background: '#070B11', borderRadius: 8, border: mfgStep === 4 ? '1px solid #16A36A' : '1px solid #1E293B', overflow: 'hidden' }}>
+                <button
+                  onClick={() => setMfgStep(4)}
+                  style={{ width: '100%', padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: mfgStep === 4 ? 'rgba(22,163,106,0.15)' : 'transparent', border: 'none', cursor: 'pointer', color: '#F8FAFC' }}
+                >
+                  <span style={{ fontSize: 12, fontWeight: 800 }}>✓ 04 BUILD DECISION</span>
+                  <span style={{ fontSize: 10, color: '#16A36A', fontWeight: 800 }}>ACCEPTED</span>
+                </button>
+                {mfgStep === 4 && (
+                  <div style={{ padding: 10, borderTop: '1px solid #1E293B', fontSize: 10.5, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div>Points Inspected: <strong style={{ color: '#F8FAFC' }}>24 / 24</strong></div>
+                    <div>Max Deviation: <strong style={{ color: '#38BDF8' }}>{maxDev.toFixed(2)} mm (Tol 0.80 mm)</strong></div>
+                    <div>Joint Checks: <strong style={{ color: '#16A36A' }}>6 / 6 PASS</strong></div>
+
+                    <div style={{ width: '100%', padding: 10, borderRadius: 6, background: 'rgba(22,163,106,0.2)', border: '1px solid #16A36A', color: '#34D399', fontWeight: 800, textAlign: 'center', marginTop: 4, fontSize: 12 }}>
+                      ✓ BUILD ACCEPTED
                     </div>
                   </div>
-                ))}
+                )}
               </div>
 
-              <div className="tiny faint" style={{ textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 6 }}>
-                Spot Weld & Structural Adhesive Summary
-              </div>
-              <div className="panel" style={{ padding: 8, background: 'rgba(0,0,0,0.25)' }}>
-                <div className="grid2" style={{ gap: 6 }}>
-                  <Stat label="Spot Welds" value="3,842" sub="Automatic robot weld" />
-                  <Stat label="Adhesive Seams" value="48.5 m" sub="Polyurethane structural" />
-                  <Stat label="Acoustic Check" value="100%" sub="Sampling passed" accent="var(--green)" />
-                  <Stat label="Torque Verification" value="72/72" sub="Critical fasteners OK" accent="var(--green)" />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 3: BUILD GENEALOGY */}
-          {activeCategory === 'genealogy' && (
-            <div className="col" style={{ flex: 1, overflowY: 'auto', gap: 10 }}>
-              <div className="spread">
-                <span className="small" style={{ fontWeight: 700, color: '#34d399' }}>Digital Build Genealogy</span>
-                <span className="prov prov-verified">VERIFIED RECORD</span>
-              </div>
-              <div className="tiny faint">Immutable Factory As-Built Traceability for {vehicleId}</div>
-
-              <div className="col" style={{ gap: 6 }}>
-                {[
-                  { station: 'Station 01 — Underbody Stamping & Blanking', biwId: 'STAMP-PUNE-2026-0814', op: 'OP-100', ts: '2026-04-22 08:30 IST', status: 'PASS' },
-                  { station: 'Station 02 — BIW Framing & Robotic Spot-Welding', biwId: 'BIW-FRAME-0287', op: 'OP-200', ts: '2026-04-22 11:15 IST', status: 'PASS' },
-                  { station: 'Station 03 — CMM Laser Metrology Cell B01–B24', biwId: 'CMM-CELL-04', op: 'OP-250', ts: '2026-04-22 13:45 IST', status: 'PASS' },
-                  { station: 'Station 04 — Battery Pack Structural Docking', biwId: 'BAT-PACK-60KWH-912', op: 'OP-300', ts: '2026-04-22 15:20 IST', status: 'PASS' },
-                  { station: 'Station 05 — E-Coat Anti-Corrosion & Paint Sealing', biwId: 'PAINT-LINE-02', op: 'OP-400', ts: '2026-04-23 09:10 IST', status: 'PASS' },
-                  { station: 'Station 06 — Trim, Chassis & Final Fastener Audit', biwId: 'FINAL-AUDIT-0287', op: 'OP-500', ts: '2026-04-23 16:30 IST', status: 'PASS' },
-                ].map((g, i) => (
-                  <div key={i} className="panel" style={{ padding: 8, background: 'rgba(0,0,0,0.25)', border: '1px solid var(--line)' }}>
-                    <div className="spread">
-                      <span className="tiny" style={{ fontWeight: 700, color: 'var(--text)' }}>{g.station}</span>
-                      <span className="chip tiny" style={{ color: 'var(--green)' }}>✓ {g.status}</span>
-                    </div>
-                    <div className="spread" style={{ marginTop: 4, fontSize: 10 }}>
-                      <span className="mono faint">ID: {g.biwId}</span>
-                      <span className="faint">{g.ts}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
             </div>
           )}
         </div>
-      </div>
 
-      {/* Floating Right Detail Panel — Selected Datum Point Card */}
-      {selectedPoint && (
-        <div
-          style={{
-            position: 'absolute',
-            top: 64,
-            right: 14,
-            width: 320,
-            zIndex: 3,
-            pointerEvents: 'auto',
-          }}
-        >
+        {/* ------------------------------------------------------------
+            CENTER COLUMN: 3D VIEWPORT CANVAS (FLEXIBLE)
+            ------------------------------------------------------------ */}
+        <div style={{ position: 'relative', flex: 1, width: '100%', height: '100%', background: '#E8EDF3', overflow: 'hidden' }}>
+          
+          {/* 3D Scene bounded strictly inside viewport */}
+          <VehicleScene />
+
+          {/* ROW 4 THIN BOTTOM VIEWPORT TOOLBAR (MAX 42px) */}
           <div
-            className="panel"
             style={{
-              padding: 12,
-              background: 'rgba(12, 16, 21, 0.88)',
-              backdropFilter: 'blur(12px)',
-              border: '1px solid rgba(16, 185, 129, 0.3)',
+              position: 'absolute',
+              bottom: 10,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 10,
+              height: 38,
+              padding: '0 12px',
+              background: 'rgba(17,26,36,0.92)',
+              backdropFilter: 'blur(8px)',
+              borderRadius: 8,
+              border: '1px solid rgba(0,166,214,0.4)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              color: '#FFFFFF',
+              fontSize: 11,
+              fontFamily: 'var(--mono)',
             }}
           >
-            <div className="spread">
-              <span className="mono" style={{ fontWeight: 700, fontSize: 13, color: '#34d399' }}>
-                DATUM POINT {selectedPoint.id}
-              </span>
-              <span className="chip tiny" style={{ color: 'var(--green)' }}>{selectedPoint.status}</span>
+            <span style={{ color: '#94A3B8', fontWeight: 700 }}>VIEW MODE:</span>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {(['nominal', 'as_built', 'deviation'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setInspectionMode(mode)}
+                  style={{
+                    padding: '3px 8px',
+                    borderRadius: 4,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    background: inspectionMode === mode ? '#00A6D6' : 'rgba(255,255,255,0.08)',
+                    color: '#FFFFFF',
+                    border: inspectionMode === mode ? '1px solid #38BDF8' : '1px solid transparent',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  {mode.replace('_', ' ')}
+                </button>
+              ))}
             </div>
-            <div className="tiny" style={{ marginTop: 2, color: 'var(--text)', fontWeight: 600 }}>{selectedPoint.name}</div>
-            <div className="tiny faint" style={{ marginTop: 1 }}>Region: {selectedPoint.region}</div>
 
-            <div className="col" style={{ marginTop: 8, gap: 6 }}>
-              <div className="panel" style={{ padding: 6, background: 'rgba(0,0,0,0.3)' }}>
-                <div className="spread">
-                  <span className="tiny faint">Nominal CAD Position:</span>
-                  <span className="mono tiny">[{selectedPoint.nominal.map((v) => v.toFixed(2)).join(', ')}] m</span>
-                </div>
-                <div className="spread" style={{ marginTop: 2 }}>
-                  <span className="tiny faint">As-Built Laser Scan:</span>
-                  <span className="mono tiny" style={{ color: '#38bdf8' }}>[{selectedPoint.measured.map((v) => v.toFixed(4)).join(', ')}] m</span>
-                </div>
+            <span style={{ color: '#94A3B8', fontWeight: 700, marginLeft: 8 }}>OPACITY:</span>
+            <input
+              type="range"
+              min="0.0"
+              max="1.0"
+              step="0.05"
+              value={wireframeOpacity}
+              onChange={(e) => setWireframeOpacity(parseFloat(e.target.value))}
+              style={{ width: 70, accentColor: '#00A6D6', cursor: 'pointer' }}
+            />
+            <span style={{ fontWeight: 700, minWidth: 28, color: '#38BDF8' }}>{Math.round(wireframeOpacity * 100)}%</span>
+          </div>
+
+        </div>
+
+        {/* ------------------------------------------------------------
+            RIGHT RESULT PANEL (280px / 0px CLOSED)
+            ------------------------------------------------------------ */}
+        {!rightCollapsed && (
+          <div
+            style={{
+              width: 280,
+              background: '#111A24',
+              borderLeft: '1px solid #1E293B',
+              display: 'flex',
+              flexDirection: 'column',
+              padding: 12,
+              gap: 10,
+              color: '#E2E8F0',
+              fontFamily: 'var(--mono)',
+              overflowY: 'auto',
+              zIndex: 5,
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #1E293B', paddingBottom: 8 }}>
+              <span style={{ fontWeight: 800, fontSize: 12, color: '#38BDF8' }}>POINT DETAILS</span>
+              <button
+                onClick={() => setRightCollapsed(true)}
+                style={{ background: 'transparent', border: 'none', color: '#94A3B8', fontSize: 14, cursor: 'pointer' }}
+                title="Close Right Panel"
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 11 }}>
+              <div style={{ background: '#070B11', padding: 8, borderRadius: 6, border: '1px solid #1E293B' }}>
+                <div style={{ color: '#94A3B8', fontSize: 10 }}>SELECTED DATUM ID</div>
+                <div style={{ fontSize: 15, fontWeight: 800, color: '#F8FAFC', marginTop: 2 }}>{selectedPoint.id} — {selectedPoint.name}</div>
+                <div style={{ fontSize: 10, color: '#38BDF8', marginTop: 1 }}>Region: {selectedPoint.region}</div>
               </div>
 
-              <div className="grid2" style={{ gap: 4 }}>
-                <div className="stat" style={{ padding: '4px 6px' }}>
-                  <span className="tiny faint">Total Deviation</span>
-                  <span className="mono" style={{ fontSize: 14, fontWeight: 700, color: 'var(--cyan)' }}>
-                    +{selectedPoint.deviationMm.toFixed(2)} mm
-                  </span>
+              <div style={{ background: '#070B11', padding: 8, borderRadius: 6, border: '1px solid #1E293B' }}>
+                <div style={{ color: '#94A3B8', fontSize: 10 }}>SCAN DEVIATION</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: selectedPoint.deviationMm > selectedPoint.toleranceMm ? '#F4A62A' : '#16A36A', marginTop: 2 }}>
+                  +{selectedPoint.deviationMm.toFixed(2)} mm
                 </div>
-                <div className="stat" style={{ padding: '4px 6px' }}>
-                  <span className="tiny faint">Tolerance Limit</span>
-                  <span className="mono" style={{ fontSize: 14, fontWeight: 700 }}>
-                    ±{selectedPoint.toleranceMm.toFixed(2)} mm
-                  </span>
-                </div>
+                <div style={{ fontSize: 9.5, color: '#64748B', marginTop: 1 }}>Tolerance Limit: ±{selectedPoint.toleranceMm.toFixed(2)} mm</div>
               </div>
 
-              <div className="panel" style={{ padding: 6, background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.2)' }}>
-                <div className="tiny" style={{ fontWeight: 600, color: '#34d399' }}>Quality Gate Disposition:</div>
-                <div className="tiny faint" style={{ marginTop: 2 }}>
-                  Deviation is well within the 6-sigma tolerance envelope. Approved for downstream battery integration and EOL commissioning.
+              <div style={{ background: '#070B11', padding: 8, borderRadius: 6, border: '1px solid #1E293B' }}>
+                <div style={{ color: '#94A3B8', fontSize: 10 }}>INSPECTION STATUS</div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: selectedPoint.status === 'ACCEPT' ? '#16A36A' : '#D83B3B', marginTop: 2 }}>
+                  {selectedPoint.status}
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Bottom Action Footer */}
-      <div
-        style={{
-          position: 'absolute',
-          bottom: 14,
-          left: 428,
-          right: 14,
-          zIndex: 2,
-          padding: '8px 14px',
-          background: 'rgba(12, 16, 21, 0.85)',
-          backdropFilter: 'blur(10px)',
-          border: '1px solid var(--line)',
-          borderRadius: 8,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 16,
-          pointerEvents: 'auto',
-        }}
-      >
-        <div className="row" style={{ gap: 8 }}>
-          <span className="tiny faint">Baseline A Status:</span>
-          <span className="chip" style={{ color: 'var(--green)' }}>✓ BASELINE A (MANUFACTURING QUALITY) FROZEN</span>
-        </div>
-        <button
-          className="btn"
-          onClick={() => navigate('controlled_val')}
-          style={{ background: '#059669', color: '#fff', fontWeight: 600, border: 'none' }}
-        >
-          Proceed to 03 Controlled Validation →
-        </button>
       </div>
     </div>
   );

@@ -9,14 +9,11 @@ import { useStore } from '../store/useStore';
 import { SENSORS } from '../data/sensors';
 import type { PageKey } from '../schema/types';
 
-const LIFECYCLE_RIBBON: { stage: string; label: string; targetPage: PageKey }[] = [
-  { stage: 'DESIGN', label: '01 CAD Design', targetPage: 'digital_eng' },
-  { stage: 'CAE', label: '02 CAE Load Cases', targetPage: 'digital_eng' },
-  { stage: 'QUALITY', label: '03 Metrology', targetPage: 'mfg_quality' },
-  { stage: 'COMMISSION', label: '04 EOL Fingerprint', targetPage: 'controlled_val' },
-  { stage: 'VALIDATION', label: '05 Rig Test', targetPage: 'controlled_val' },
-  { stage: 'ROAD', label: '06 Proving Ground', targetPage: 'road_corr' },
-  { stage: 'FIELD', label: '07 Live Twin', targetPage: 'live_twin' },
+const LIFECYCLE_RIBBON: { stage: string; label: string; badge: string; targetPage: PageKey }[] = [
+  { stage: 'DESIGN', label: '01 DESIGN', badge: 'CAE', targetPage: 'digital_eng' },
+  { stage: 'BUILD', label: '02 BUILD', badge: 'MFG', targetPage: 'mfg_quality' },
+  { stage: 'VALIDATE', label: '03 VALIDATE', badge: 'TEST', targetPage: 'controlled_val' },
+  { stage: 'MONITOR', label: '04 MONITOR', badge: 'LIVE', targetPage: 'live_twin' },
 ];
 
 export function TopBar() {
@@ -40,24 +37,24 @@ export function TopBar() {
 
   const pageTitle: Record<string, string> = {
     command: 'Command Center',
-    workbench: 'Manual Engineering Workbench & Load Lab',
-    digital_eng: '01 Digital Engineering & CAE',
-    mfg_quality: '02 Manufacturing Quality & Metrology',
-    controlled_val: '03 Controlled Validation & Test Rigs',
-    road_corr: '04 Road Correlation & Proving Ground',
-    live_twin: '05 Live Structural Digital Twin',
-    eng_analytics: '06 Engineering Analytics & Root-Cause',
-    passport: '07 Vehicle Digital Passport',
-    twin: '3D Vehicle Twin',
+    workbench: 'Manual Engineering Workbench',
+    digital_eng: '01 Design & CAE Validation',
+    mfg_quality: '02 Manufacturing & Baseline',
+    controlled_val: '03 Vehicle Testing & Validation',
+    road_corr: '03 Vehicle Testing — Road Correlation',
+    live_twin: '04 Live Structural Health',
+    eng_analytics: '04 Structural Analytics & Diagnostics',
+    passport: 'Vehicle Digital Passport',
+    twin: '3D Vehicle Digital Twin',
     intelligence: 'Structural Intelligence',
-    manufacturing: 'Manufacturing Digital Thread',
+    manufacturing: 'Manufacturing Thread',
     telemetry: 'Live Telemetry Stream',
     hardware: 'Hardware Live Diagnostic',
-    fleet: 'Fleet Analytics',
+    fleet: 'Fleet Structural Health',
     forensics: 'Event Forensics Replay',
     diagnostics: 'AI Diagnostics',
-    investigations: 'Investigations',
-    reports: 'Engineering Reports',
+    investigations: 'Engineering Investigations',
+    reports: 'Event History & Records',
     settings: 'Settings & Data Sources',
   };
 
@@ -76,59 +73,74 @@ export function TopBar() {
         position: 'relative',
       }}
     >
-      <div className="row" style={{ gap: 8, minWidth: 260 }}>
-        <span className="h3" style={{ margin: 0, fontSize: 14 }}>
-          {pageTitle[page] ?? 'SHIELD'}
+      <div className="row" style={{ gap: 8, minWidth: 240 }}>
+        <span style={{ margin: 0, fontSize: 14, fontWeight: 600, letterSpacing: '-0.2px', color: '#E6EDF5' }}>
+          {pageTitle[page] ?? 'SHIELD EV'}
         </span>
       </div>
 
-      {/* CONTINUOUS DIGITAL THREAD LIFECYCLE RIBBON */}
+      {/* CONTINUOUS 4-STAGE LIFECYCLE THREAD RIBBON */}
       <div
         className="desktop-only row"
         style={{
           flex: 1,
           justifyContent: 'center',
-          gap: 2,
+          gap: 6,
           background: 'rgba(0,0,0,0.35)',
-          padding: '2px 6px',
+          padding: '3px 10px',
           borderRadius: 6,
           border: '1px solid var(--line)',
-          maxWidth: 780,
+          maxWidth: 620,
         }}
       >
         {LIFECYCLE_RIBBON.map((r, i) => {
-          const isCurrent =
-            (r.stage === 'DESIGN' && page === 'digital_eng') ||
-            (r.stage === 'CAE' && page === 'digital_eng') ||
-            (r.stage === 'QUALITY' && page === 'mfg_quality') ||
-            (r.stage === 'COMMISSION' && page === 'controlled_val') ||
-            (r.stage === 'VALIDATION' && page === 'controlled_val') ||
-            (r.stage === 'ROAD' && page === 'road_corr') ||
-            (r.stage === 'FIELD' && (page === 'live_twin' || page === 'twin' || page === 'eng_analytics'));
+          const currentStageIndex =
+            page === 'mfg_quality' ? 1 : page === 'controlled_val' ? 2 : page === 'live_twin' ? 3 : 0;
+          const isCompleted = i < currentStageIndex;
+          const isCurrent = i === currentStageIndex;
+          const iconSymbol = isCompleted ? '✓' : isCurrent ? '●' : '○';
 
           return (
-            <div key={r.stage} className="row" style={{ gap: 2 }}>
+            <div key={r.stage} className="row" style={{ gap: 4, alignItems: 'center' }}>
               <button
                 onClick={() => navigate(r.targetPage)}
                 style={{
-                  padding: '3px 7px',
-                  fontSize: 10,
-                  fontFamily: 'var(--mono)',
-                  fontWeight: isCurrent ? 700 : 500,
+                  padding: '3px 10px',
+                  fontSize: 12,
+                  fontFamily: 'var(--font-sans)',
+                  fontWeight: 500,
                   borderRadius: 4,
-                  border: isCurrent ? '1px solid rgba(56,189,248,0.6)' : '1px solid transparent',
-                  background: isCurrent ? 'linear-gradient(135deg, #0e7490, #155e75)' : 'transparent',
-                  color: isCurrent ? '#fff' : 'var(--muted)',
+                  border: isCurrent ? '1px solid #06b6d4' : '1px solid transparent',
+                  background: isCurrent ? 'linear-gradient(135deg, #0891b2, #0e7490)' : 'transparent',
+                  color: isCurrent ? '#fff' : isCompleted ? '#34d399' : 'var(--muted)',
                   cursor: 'pointer',
                   transition: 'all 0.12s ease',
                   whiteSpace: 'nowrap',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 5,
                 }}
-                title={`Jump to ${r.label}`}
+                title={`Stage 0${i + 1}: ${r.stage}`}
               >
-                {r.label}
+                <span style={{ fontSize: 10, color: isCurrent ? '#38bdf8' : isCompleted ? '#10b981' : 'var(--faint)' }}>
+                  {iconSymbol}
+                </span>
+                <span>{r.label}</span>
+                <span
+                  style={{
+                    fontSize: 8.5,
+                    padding: '0.5px 3.5px',
+                    borderRadius: 3,
+                    background: isCurrent ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.06)',
+                    color: isCurrent ? '#fff' : 'var(--faint)',
+                    fontWeight: 500,
+                  }}
+                >
+                  {r.badge}
+                </span>
               </button>
               {i < LIFECYCLE_RIBBON.length - 1 && (
-                <span style={{ fontSize: 9, color: 'var(--faint)', margin: '0 1px' }}>→</span>
+                <span style={{ fontSize: 10, color: 'var(--faint)', margin: '0 2px' }}>→</span>
               )}
             </div>
           );

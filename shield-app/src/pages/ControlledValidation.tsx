@@ -1,421 +1,516 @@
 /* ============================================================
-   SHIELD — MODULE 03: CONTROLLED VALIDATION RIGS & CAE CORRELATION
-   Automotive structural testing facility featuring:
-   - 5 Selectable Virtual/Physical Test Rigs (4-Post, Torsion, Bending, Modal, Battery Mount)
-   - Real-Time Dynamic Actuator & Strip Chart Telemetry
-   - Exaggerated Visual Deformation Scaling (Lab ×25 mode)
-   - CAE vs Physical Correlation Matrix (Residuals & Confidence)
-   - End-of-Line Commissioning Fingerprint (Baseline B Freeze)
+   SHIELD — STAGE 03: VALIDATE & CONTROLLED TEST LAB WORKSTATION
+   Strict 3-Column Professional Engineering Workspace Layout
+   - Row 1: Single Top Global Navigation (handled by App Shell TopBar)
+   - Row 2: Page Header & Toolbar with Dark Navy Heading (#101820)
+   - Row 3: Grid (300px Left Collapsible Panel | Flexible Viewport | 280px Right Result Panel)
+   - 5 Major Steps: 01 Test Setup, 02 Apply Load, 03 Response, 04 CAE Correlation, 05 Decision
+   - Row 4: Thin 42px Viewport Toolbar (Stress | Strain | Deformation | Load Path)
    ============================================================ */
 
 import { useState, useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import { VehicleScene } from '../three/VehicleScene';
-import { TEST_RIGS, type TestRigDef } from '../data/engineering';
-import { SENSORS } from '../data/sensors';
-import { Card, Stat, ProvTag } from '../ui/kit';
-import type { TestRigType } from '../schema/types';
+import { TEST_RIGS, PROVING_GROUND_SECTORS } from '../data/engineering';
+import { PageHeader } from '../ui/PageHeader';
 
 export function ControlledValidation() {
   const activeTestRig = useStore((s) => s.activeTestRig);
   const setActiveTestRig = useStore((s) => s.setActiveTestRig);
   const visualDeformationScale = useStore((s) => s.visualDeformationScale);
   const setVisualDeformationScale = useStore((s) => s.setVisualDeformationScale);
-  const sensorLive = useStore((s) => s.sensorLive);
-  const navigate = useStore((s) => s.navigate);
+  const requestResetCamera = useStore((s) => s.requestResetCamera);
+  const viewMode = useStore((s) => s.viewMode);
+  const setViewMode = useStore((s) => s.setViewMode);
+  const wireframeOpacity = useStore((s) => s.wireframeOpacity);
+  const setWireframeOpacity = useStore((s) => s.setWireframeOpacity);
 
-  const [activeTab, setActiveTab] = useState<'rig' | 'correlation' | 'baseline_b'>('rig');
-  const [testFrequencyHz, setTestFrequencyHz] = useState<number>(4.5);
-  const [testAmplitudeMm, setTestAmplitudeMm] = useState<number>(18.0);
-  const [testRunning, setTestRunning] = useState<boolean>(true);
-  const [simTime, setSimTime] = useState<number>(0);
+  // Layout & Panel Collapse State
+  const [leftCollapsed, setLeftCollapsed] = useState<boolean>(false);
+  const [rightCollapsed, setRightCollapsed] = useState<boolean>(false);
+  const [testStep, setTestStep] = useState<1 | 2 | 3 | 4 | 5>(1);
 
-  useEffect(() => {
-    if (!testRunning) return;
-    const interval = setInterval(() => {
-      setSimTime((t) => t + 0.05);
-    }, 50);
-    return () => clearInterval(interval);
-  }, [testRunning]);
+  // Test Simulation State
+  const [targetComponent, setTargetComponent] = useState<string>('Front Left Rail (HP-F01-L)');
+  const [testLoadType, setTestLoadType] = useState<string>('Vertical Bump');
+  const [loadDirection, setLoadDirection] = useState<string>('-Y Down');
+  const [appliedLoadKn, setAppliedLoadKn] = useState<number>(15.0);
+  const [loadState, setLoadState] = useState<'IDLE' | 'HOLD' | 'RELEASING'>('IDLE');
+  const [metricMode, setMetricMode] = useState<'stress' | 'strain' | 'displacement' | 'loadpath'>('stress');
 
-  const rig = TEST_RIGS[activeTestRig];
+  // Calculated Structural Metrics
+  const stressMpa = Math.round(appliedLoadKn * 10.0);
+  const strainMicro = Math.round(stressMpa * 4.76);
+  const dispMm = Math.round((appliedLoadKn * 0.24) * 10) / 10;
+  const utilizationPct = Math.round((stressMpa / 250.0) * 100);
+  const safetyFactor = Math.round((250.0 / Math.max(1, stressMpa)) * 100) / 100;
 
-  // Dynamic simulated actuator values based on frequency & time
-  const actFL = Math.sin(simTime * testFrequencyHz * 2 * Math.PI) * testAmplitudeMm;
-  const actFR = Math.sin(simTime * testFrequencyHz * 2 * Math.PI + 0.4) * testAmplitudeMm;
-  const actRL = Math.sin(simTime * testFrequencyHz * 2 * Math.PI + Math.PI * 0.8) * testAmplitudeMm;
-  const actRR = Math.sin(simTime * testFrequencyHz * 2 * Math.PI + Math.PI * 0.8 + 0.4) * testAmplitudeMm;
-
-  const currentTorqueNm = activeTestRig === 'torsion' ? 3000 : 0;
-  const currentAngleDeg = activeTestRig === 'torsion' ? 0.141 : 0;
-  const currentKnmPerDeg = activeTestRig === 'torsion' ? 21.2 : 0;
+  // Thresholds: SAFE (0-25 kN), WARNING (25-45 kN), CRITICAL (>45 kN)
+  const thresholdState = appliedLoadKn > 45 ? 'CRITICAL' : appliedLoadKn > 25 ? 'WARNING' : 'SAFE';
 
   return (
-    <div className="controlled-val-layout" style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-      {/* 3D Scene */}
-      <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
-        <VehicleScene />
-      </div>
-
-      {/* Top Header Ribbon */}
-      <div
-        style={{
-          position: 'relative',
-          zIndex: 2,
-          padding: '10px 16px',
-          background: 'linear-gradient(180deg, rgba(12,16,21,0.92) 0%, rgba(12,16,21,0.6) 75%, transparent 100%)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 12,
-          flexWrap: 'wrap',
-          pointerEvents: 'auto',
-        }}
+    <div
+      className="controlled-val-layout"
+      style={{
+        position: 'relative',
+        width: '100%',
+        height: '100%',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        background: '#E8EDF3',
+        color: '#101820',
+        fontFamily: 'var(--sans)',
+      }}
+    >
+      {/* ============================================================
+          ROW 2 — PAGE HEADER / TOOLBAR (SOLID LIGHT BG, DARK NAVY HEADING)
+          ============================================================ */}
+      <PageHeader
+        title="03 Validate & Testing"
+        description='"Does the manufactured structure behave as predicted?"'
+        badge="TEST LAB RIG"
+        badgeType="default"
       >
-        <div className="row" style={{ gap: 12 }}>
-          <div
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 12, fontWeight: 500, color: '#94A3B8' }}>DATA SOURCE:</span>
+          <select
             style={{
-              width: 32,
-              height: 32,
+              fontSize: 13,
+              fontWeight: 600,
+              padding: '6px 10px',
               borderRadius: 6,
-              background: 'linear-gradient(135deg, #4338ca, #312e81)',
-              border: '1px solid #6366f1',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#a5b4fc',
-              fontWeight: 800,
-              fontSize: 14,
+              background: '#141b24',
+              border: '1px solid #273342',
+              color: '#F8FAFC',
+              cursor: 'pointer',
+              fontFamily: 'var(--font-sans)',
             }}
           >
-            03
-          </div>
-          <div>
-            <div className="row" style={{ gap: 8 }}>
-              <span style={{ fontWeight: 700, fontSize: 14, letterSpacing: '0.04em', color: '#f8fafc' }}>
-                CONTROLLED STRUCTURAL VALIDATION & TEST RIGS
-              </span>
-              <span className="prov prov-verified">LABORATORY RIG DATA</span>
-              <span className="prov prov-sim">SYNCHRONIZED STRIP CHART</span>
-            </div>
-            <div className="tiny faint" style={{ marginTop: 2 }}>
-              Multi-Axis Servo-Hydraulic Actuation · Dynamic Modal NVH · CAE Physical Correlation
-            </div>
-          </div>
+            <option value="test_rig">Engineering Stream (Test Rig A)</option>
+          </select>
         </div>
 
-        {/* Test Rig Selectors */}
-        <div className="row wrap" style={{ gap: 6 }}>
-          {(['four_post', 'torsion', 'bending', 'modal', 'battery_mount'] as TestRigType[]).map((r) => {
-            const active = activeTestRig === r;
-            const label = r === 'four_post' ? '4-Post Rig' : r === 'torsion' ? 'Torsional Rig' : r === 'bending' ? 'Bending Rig' : r === 'modal' ? 'Modal NVH' : 'Battery Mount Rig';
-            return (
-              <button
-                key={r}
-                className={`btn ${active ? 'active' : ''}`}
-                onClick={() => setActiveTestRig(r)}
-                style={{
-                  background: active ? '#4f46e5' : undefined,
-                  borderColor: active ? '#6366f1' : undefined,
-                  color: active ? '#fff' : undefined,
-                  fontSize: 12,
-                }}
-              >
-                {label}
-              </button>
-            );
-          })}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 12, fontWeight: 500, color: '#94A3B8' }}>VIEW:</span>
+          <select
+            value={viewMode}
+            onChange={(e) => setViewMode(e.target.value as any)}
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              padding: '6px 10px',
+              borderRadius: 6,
+              background: '#141b24',
+              border: '1px solid #273342',
+              color: '#F8FAFC',
+              cursor: 'pointer',
+              fontFamily: 'var(--font-sans)',
+            }}
+          >
+            <option value="chassis">Complete Vehicle / Chassis</option>
+            <option value="skeletal">Skeletal Frame Only</option>
+            <option value="transparent">Transparent Stress Overlay</option>
+          </select>
         </div>
-      </div>
 
-      {/* Floating Left Panel — Rig Controls & Correlation */}
-      <div
-        style={{
-          position: 'absolute',
-          top: 64,
-          left: 14,
-          bottom: 14,
-          width: 400,
-          zIndex: 3,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 10,
-          pointerEvents: 'auto',
-        }}
-      >
-        <div
-          className="panel"
+        <button
+          onClick={() => requestResetCamera()}
           style={{
-            padding: 12,
-            background: 'rgba(12, 16, 21, 0.88)',
-            backdropFilter: 'blur(12px)',
-            border: '1px solid rgba(99, 102, 241, 0.25)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 10,
-            flex: 1,
-            overflow: 'hidden',
+            fontSize: 13,
+            fontWeight: 600,
+            padding: '6px 12px',
+            borderRadius: 6,
+            background: '#141b24',
+            border: '1px solid #273342',
+            color: '#F8FAFC',
+            cursor: 'pointer',
+            fontFamily: 'var(--font-sans)',
           }}
         >
-          {/* Sub Navigation */}
-          <div className="row" style={{ background: 'var(--bg2)', padding: 3, borderRadius: 6, gap: 4 }}>
+          ⟳ Reset View
+        </button>
+      </PageHeader>
+
+      {/* ============================================================
+          ROW 3 — MAIN WORKSPACE GRID (300px LEFT | FLEX VIEWPORT | 280px RIGHT)
+          ============================================================ */}
+      <div
+        style={{
+          flex: 1,
+          display: 'grid',
+          gridTemplateColumns: `${leftCollapsed ? '48px' : '300px'} minmax(0, 1fr) ${rightCollapsed ? '0px' : '280px'}`,
+          overflow: 'hidden',
+          position: 'relative',
+          transition: 'grid-template-columns 0.2s ease',
+        }}
+      >
+        {/* ------------------------------------------------------------
+            LEFT CONTROL PANEL (300px / 48px COLLAPSED)
+            ------------------------------------------------------------ */}
+        <div
+          style={{
+            background: '#111A24',
+            borderRight: '1px solid #1E293B',
+            display: 'flex',
+            flexDirection: 'column',
+            overflowY: 'auto',
+            zIndex: 5,
+            color: '#E2E8F0',
+            fontFamily: 'var(--mono)',
+            padding: leftCollapsed ? 8 : 12,
+            gap: 12,
+          }}
+        >
+          {/* HEADER & COLLAPSE BUTTON */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: leftCollapsed ? 'center' : 'space-between', borderBottom: '1px solid #1E293B', paddingBottom: leftCollapsed ? 4 : 8 }}>
+            {!leftCollapsed && <span style={{ fontWeight: 800, fontSize: 12, color: '#00A6D6', letterSpacing: '0.05em' }}>CONTROLLED TEST</span>}
             <button
-              style={{
-                flex: 1,
-                padding: '6px 4px',
-                fontSize: 11,
-                fontWeight: 600,
-                borderRadius: 4,
-                border: 'none',
-                background: activeTab === 'rig' ? '#4f46e5' : 'transparent',
-                color: activeTab === 'rig' ? '#fff' : 'var(--muted)',
-                cursor: 'pointer',
-              }}
-              onClick={() => setActiveTab('rig')}
+              onClick={() => setLeftCollapsed(!leftCollapsed)}
+              style={{ background: 'transparent', border: 'none', color: '#38BDF8', fontSize: 14, cursor: 'pointer' }}
+              title={leftCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
             >
-              Test Rig Control
-            </button>
-            <button
-              style={{
-                flex: 1,
-                padding: '6px 4px',
-                fontSize: 11,
-                fontWeight: 600,
-                borderRadius: 4,
-                border: 'none',
-                background: activeTab === 'correlation' ? '#4f46e5' : 'transparent',
-                color: activeTab === 'correlation' ? '#fff' : 'var(--muted)',
-                cursor: 'pointer',
-              }}
-              onClick={() => setActiveTab('correlation')}
-            >
-              CAE ↔ Physical
-            </button>
-            <button
-              style={{
-                flex: 1,
-                padding: '6px 4px',
-                fontSize: 11,
-                fontWeight: 600,
-                borderRadius: 4,
-                border: 'none',
-                background: activeTab === 'baseline_b' ? '#4f46e5' : 'transparent',
-                color: activeTab === 'baseline_b' ? '#fff' : 'var(--muted)',
-                cursor: 'pointer',
-              }}
-              onClick={() => setActiveTab('baseline_b')}
-            >
-              Baseline B Freeze
+              ☰
             </button>
           </div>
 
-          {/* TAB 1: RIG CONTROLS & CHANNELS */}
-          {activeTab === 'rig' && (
-            <div className="col" style={{ flex: 1, overflowY: 'auto', gap: 10 }}>
-              <div className="panel" style={{ padding: 10, background: 'rgba(0,0,0,0.3)', border: '1px solid var(--line)' }}>
-                <div className="spread">
-                  <span style={{ fontWeight: 700, fontSize: 13, color: '#a5b4fc' }}>{rig.name}</span>
-                  <span className="prov prov-verified">{rig.caeCorrelationScorePct}% CAE Fit</span>
-                </div>
-                <div className="tiny faint" style={{ marginTop: 2 }}>Facility: {rig.facility}</div>
-                <div className="tiny faint" style={{ marginTop: 4, lineHeight: 1.3 }}>{rig.description}</div>
+          {!leftCollapsed && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              
+              {/* STEP 1: TEST SETUP */}
+              <div style={{ background: '#070B11', borderRadius: 8, border: testStep === 1 ? '1px solid #00A6D6' : '1px solid #1E293B', overflow: 'hidden' }}>
+                <button
+                  onClick={() => setTestStep(1)}
+                  style={{ width: '100%', padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: testStep === 1 ? 'rgba(0,166,214,0.15)' : 'transparent', border: 'none', cursor: 'pointer', color: '#F8FAFC' }}
+                >
+                  <span style={{ fontSize: 12, fontWeight: 800 }}>✓ 01 TEST SETUP</span>
+                  <span style={{ fontSize: 10, color: '#00A6D6', fontWeight: 700 }}>CONFIGURED</span>
+                </button>
+                {testStep === 1 && (
+                  <div style={{ padding: 10, borderTop: '1px solid #1E293B', fontSize: 11, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      <span style={{ fontSize: 10, color: '#94A3B8' }}>TEST TYPE:</span>
+                      <select
+                        value={testLoadType}
+                        onChange={(e) => setTestLoadType(e.target.value)}
+                        style={{ background: '#0F172A', color: '#F8FAFC', border: '1px solid #334155', padding: 4, borderRadius: 4, fontSize: 11 }}
+                      >
+                        <option value="Vertical Bump">Vertical Bump Excitation</option>
+                        <option value="Torsion Couple">Pure Torsional Couple</option>
+                        <option value="Bending Ram">Static Floor Bending</option>
+                      </select>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      <span style={{ fontSize: 10, color: '#94A3B8' }}>TARGET COMPONENT:</span>
+                      <select
+                        value={targetComponent}
+                        onChange={(e) => setTargetComponent(e.target.value)}
+                        style={{ background: '#0F172A', color: '#38BDF8', border: '1px solid #334155', padding: 4, borderRadius: 4, fontSize: 11, fontWeight: 700 }}
+                      >
+                        <option value="Front Left Rail (HP-F01-L)">Front Left Rail (HP-F01-L)</option>
+                        <option value="Battery Tray Mount FL">Battery Tray Mount FL</option>
+                        <option value="Rear Subframe Crossmember">Rear Subframe Crossmember</option>
+                      </select>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      <span style={{ fontSize: 10, color: '#94A3B8' }}>DIRECTION:</span>
+                      <select
+                        value={loadDirection}
+                        onChange={(e) => setLoadDirection(e.target.value)}
+                        style={{ background: '#0F172A', color: '#F8FAFC', border: '1px solid #334155', padding: 4, borderRadius: 4, fontSize: 11 }}
+                      >
+                        <option value="-Y Down">-Y Vertical Downward</option>
+                        <option value="+X Transverse">+X Transverse Inward</option>
+                        <option value="+Z Longitudinal">+Z Longitudinal Crash</option>
+                      </select>
+                    </div>
+
+                    <button
+                      onClick={() => setTestStep(2)}
+                      style={{ width: '100%', padding: '6px', borderRadius: 6, background: '#00A6D6', color: '#FFF', fontWeight: 800, border: 'none', cursor: 'pointer', fontSize: 11 }}
+                    >
+                      ▶ START TEST SETUP
+                    </button>
+                  </div>
+                )}
               </div>
 
-              {/* Dynamic Actuator Channels */}
-              {activeTestRig === 'four_post' && (
-                <div className="col" style={{ gap: 6 }}>
-                  <div className="tiny faint" style={{ textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                    4-Corner Hydraulic Actuator Channels
-                  </div>
-                  <div className="grid2" style={{ gap: 6 }}>
-                    <div className="stat" style={{ padding: '6px 8px' }}>
-                      <span className="tiny faint">Actuator FL (Front-Left)</span>
-                      <span className="mono" style={{ fontSize: 14, fontWeight: 700, color: actFL >= 0 ? '#38bdf8' : '#f59e0b' }}>
-                        {actFL >= 0 ? `+${actFL.toFixed(1)}` : actFL.toFixed(1)} mm
-                      </span>
+              {/* STEP 2: APPLY LOAD */}
+              <div style={{ background: '#070B11', borderRadius: 8, border: testStep === 2 ? '1px solid #00A6D6' : '1px solid #1E293B', overflow: 'hidden' }}>
+                <button
+                  onClick={() => setTestStep(2)}
+                  style={{ width: '100%', padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: testStep === 2 ? 'rgba(0,166,214,0.15)' : 'transparent', border: 'none', cursor: 'pointer', color: '#F8FAFC' }}
+                >
+                  <span style={{ fontSize: 12, fontWeight: 800 }}>✓ 02 APPLY LOAD</span>
+                  <span style={{ fontSize: 10, color: thresholdState === 'SAFE' ? '#16A36A' : thresholdState === 'WARNING' ? '#F4A62A' : '#D83B3B', fontWeight: 800 }}>
+                    {appliedLoadKn.toFixed(1)} kN
+                  </span>
+                </button>
+                {testStep === 2 && (
+                  <div style={{ padding: 10, borderTop: '1px solid #1E293B', fontSize: 10.5, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#94A3B8' }}>
+                      <span>APPLIED LOAD:</span>
+                      <span style={{ fontWeight: 800, color: '#38BDF8', fontSize: 13 }}>{appliedLoadKn.toFixed(1)} kN</span>
                     </div>
-                    <div className="stat" style={{ padding: '6px 8px' }}>
-                      <span className="tiny faint">Actuator FR (Front-Right)</span>
-                      <span className="mono" style={{ fontSize: 14, fontWeight: 700, color: actFR >= 0 ? '#38bdf8' : '#f59e0b' }}>
-                        {actFR >= 0 ? `+${actFR.toFixed(1)}` : actFR.toFixed(1)} mm
-                      </span>
-                    </div>
-                    <div className="stat" style={{ padding: '6px 8px' }}>
-                      <span className="tiny faint">Actuator RL (Rear-Left)</span>
-                      <span className="mono" style={{ fontSize: 14, fontWeight: 700, color: actRL >= 0 ? '#38bdf8' : '#f59e0b' }}>
-                        {actRL >= 0 ? `+${actRL.toFixed(1)}` : actRL.toFixed(1)} mm
-                      </span>
-                    </div>
-                    <div className="stat" style={{ padding: '6px 8px' }}>
-                      <span className="tiny faint">Actuator RR (Rear-Right)</span>
-                      <span className="mono" style={{ fontSize: 14, fontWeight: 700, color: actRR >= 0 ? '#38bdf8' : '#f59e0b' }}>
-                        {actRR >= 0 ? `+${actRR.toFixed(1)}` : actRR.toFixed(1)} mm
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
 
-              {/* Torsion Specific Results */}
-              {activeTestRig === 'torsion' && (
-                <div className="col" style={{ gap: 6 }}>
-                  <div className="tiny faint" style={{ textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                    Torsional Rigidity Metrics
-                  </div>
-                  <div className="grid2" style={{ gap: 6 }}>
-                    <Stat label="Applied Couple" value={`${currentTorqueNm} Nm`} sub="±1500 Nm spindles" accent="var(--cyan)" />
-                    <Stat label="Torsional Angle θ" value={`${currentAngleDeg}°`} sub="laser gauge" />
-                    <Stat label="Measured Rigidity" value={`${currentKnmPerDeg} kNm/°`} sub="K = T / θ" accent="var(--green)" />
-                    <Stat label="CAE Prediction" value="21.5 kNm/°" sub="Residual -1.4%" />
-                  </div>
-                </div>
-              )}
+                    <input
+                      type="range"
+                      min="0"
+                      max="60"
+                      step="1"
+                      value={appliedLoadKn}
+                      onChange={(e) => setAppliedLoadKn(parseFloat(e.target.value))}
+                      style={{ width: '100%', accentColor: '#00A6D6', cursor: 'pointer' }}
+                    />
 
-              {/* Test Input Parameters */}
-              <div className="col" style={{ gap: 6 }}>
-                <div className="spread">
-                  <span className="tiny faint">Excitation Frequency: {testFrequencyHz.toFixed(1)} Hz</span>
-                  <span className="tiny faint">Amplitude: ±{testAmplitudeMm.toFixed(0)} mm</span>
-                </div>
-                <input
-                  type="range"
-                  min="0.5"
-                  max="20"
-                  step="0.5"
-                  value={testFrequencyHz}
-                  onChange={(e) => setTestFrequencyHz(parseFloat(e.target.value))}
-                />
-                <div className="row" style={{ gap: 8, marginTop: 4 }}>
-                  <button
-                    className={`btn ${testRunning ? 'active' : ''}`}
-                    onClick={() => setTestRunning(!testRunning)}
-                    style={{ flex: 1 }}
-                  >
-                    {testRunning ? '⏸ Pause Test Rig' : '▶ Run Test Rig'}
-                  </button>
-                  <button
-                    className={`btn ${visualDeformationScale > 1 ? 'active' : ''}`}
-                    onClick={() => setVisualDeformationScale(visualDeformationScale > 1 ? 1 : 25)}
-                    title="Exaggerate 3D mesh deformation by 25x"
-                    style={{ flex: 1, borderColor: visualDeformationScale > 1 ? 'var(--amber)' : undefined }}
-                  >
-                    Visual Def ×{visualDeformationScale}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 2: CAE ↔ PHYSICAL CORRELATION */}
-          {activeTab === 'correlation' && (
-            <div className="col" style={{ flex: 1, overflowY: 'auto', gap: 10 }}>
-              <div className="spread">
-                <span className="small" style={{ fontWeight: 700, color: '#a5b4fc' }}>CAE ↔ Physical Correlation</span>
-                <span className="prov prov-verified">R² = 0.984</span>
-              </div>
-              <div className="tiny faint">Direct Comparison of Precomputed CAE vs Rig Sensor Signals</div>
-
-              <div className="col" style={{ gap: 6 }}>
-                {[
-                  { channel: 'Front Rail Strain SG1 (S01)', cae: '448 με', measured: '452 με', residual: '+0.89%', match: 'PASS' },
-                  { channel: 'Front Rail Strain SG2 (S02)', cae: '450 με', measured: '455 με', residual: '+1.11%', match: 'PASS' },
-                  { channel: 'Battery Mount FL (S03)', cae: '215 με', measured: '218 με', residual: '+1.39%', match: 'PASS' },
-                  { channel: 'Battery Mount FR (S04)', cae: '218 με', measured: '221 με', residual: '+1.37%', match: 'PASS' },
-                  { channel: '1st Torsional Mode Freq', cae: '28.1 Hz', measured: '28.4 Hz', residual: '+1.06%', match: 'PASS' },
-                  { channel: '1st Bending Mode Freq', cae: '35.8 Hz', measured: '36.2 Hz', residual: '+1.11%', match: 'PASS' },
-                  { channel: 'Torsional Rigidity K', cae: '21.5 kNm/°', measured: '21.2 kNm/°', residual: '-1.39%', match: 'PASS' },
-                ].map((item, i) => (
-                  <div key={i} className="panel" style={{ padding: 6, background: 'rgba(0,0,0,0.25)', border: '1px solid var(--line)' }}>
-                    <div className="spread">
-                      <span className="tiny" style={{ fontWeight: 600 }}>{item.channel}</span>
-                      <span className="chip tiny" style={{ color: 'var(--green)' }}>✓ {item.match}</span>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button
+                        onClick={() => setLoadState('HOLD')}
+                        style={{ flex: 1, padding: 5, borderRadius: 4, background: '#0F172A', border: '1px solid #334155', color: '#FFF', fontWeight: 700, cursor: 'pointer', fontSize: 10 }}
+                      >
+                        HOLD
+                      </button>
+                      <button
+                        onClick={() => setAppliedLoadKn(0)}
+                        style={{ flex: 1, padding: 5, borderRadius: 4, background: '#0F172A', border: '1px solid #334155', color: '#94A3B8', fontWeight: 700, cursor: 'pointer', fontSize: 10 }}
+                      >
+                        RELEASE
+                      </button>
                     </div>
-                    <div className="spread" style={{ marginTop: 3, fontSize: 11 }}>
-                      <span className="mono faint">CAE: {item.cae}</span>
-                      <span className="mono" style={{ color: '#38bdf8' }}>Measured: {item.measured}</span>
-                      <span className="mono faint">Δ: {item.residual}</span>
+
+                    {/* DYNAMIC THRESHOLD LIGHTS DERIVED FROM COMPONENT PROFILE */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9.5, paddingTop: 4, borderTop: '1px solid #1E293B' }}>
+                      <span style={{ color: thresholdState === 'SAFE' ? '#16A36A' : '#64748B', fontWeight: thresholdState === 'SAFE' ? 800 : 500 }}>● SAFE (0-25 kN)</span>
+                      <span style={{ color: thresholdState === 'WARNING' ? '#F4A62A' : '#64748B', fontWeight: thresholdState === 'WARNING' ? 800 : 500 }}>● WARN (25-45 kN)</span>
+                      <span style={{ color: thresholdState === 'CRITICAL' ? '#D83B3B' : '#64748B', fontWeight: thresholdState === 'CRITICAL' ? 800 : 500 }}>● CRIT (&gt;45 kN)</span>
                     </div>
                   </div>
-                ))}
+                )}
               </div>
 
-              <div className="panel" style={{ padding: 8, background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.2)' }}>
-                <div className="tiny" style={{ fontWeight: 600, color: '#a5b4fc' }}>Validation Coverage: 98.4%</div>
-                <div className="tiny faint" style={{ marginTop: 2 }}>
-                  Physical validation evidence correlates with CAE nominal predictions within acceptable automotive engineering thresholds (&lt;3.0% residual).
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 3: BASELINE B FREEZE */}
-          {activeTab === 'baseline_b' && (
-            <div className="col" style={{ flex: 1, overflowY: 'auto', gap: 10 }}>
-              <div className="spread">
-                <span className="small" style={{ fontWeight: 700, color: '#a5b4fc' }}>Baseline B Commissioning Freeze</span>
-                <span className="prov prov-verified">FROZEN</span>
-              </div>
-              <div className="tiny faint">Vehicle-Specific Healthy Structural Fingerprint</div>
-
-              <div className="col" style={{ gap: 6 }}>
-                <div className="panel" style={{ padding: 8, background: 'rgba(0,0,0,0.25)' }}>
-                  <span className="tiny faint">Commissioning Summary:</span>
-                  <div className="grid2" style={{ marginTop: 6, gap: 4 }}>
-                    <Stat label="Baseline Timestamp" value="2026-05-15" sub="14:30:00 IST" />
-                    <Stat label="Test Facility" value="Lab Rig 4" sub="Tata Pune NVH" />
-                    <Stat label="Sensors Calibrated" value="11 / 11" sub="100% Verified" accent="var(--green)" />
-                    <Stat label="Baseline Status" value="LOCKED" sub="Immutable Key" accent="var(--cyan)" />
+              {/* STEP 3: RESPONSE */}
+              <div style={{ background: '#070B11', borderRadius: 8, border: testStep === 3 ? '1px solid #00A6D6' : '1px solid #1E293B', overflow: 'hidden' }}>
+                <button
+                  onClick={() => setTestStep(3)}
+                  style={{ width: '100%', padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: testStep === 3 ? 'rgba(0,166,214,0.15)' : 'transparent', border: 'none', cursor: 'pointer', color: '#F8FAFC' }}
+                >
+                  <span style={{ fontSize: 12, fontWeight: 800 }}>✓ 03 RESPONSE</span>
+                  <span style={{ fontSize: 10, color: '#38BDF8', fontWeight: 700 }}>{stressMpa} MPa</span>
+                </button>
+                {testStep === 3 && (
+                  <div style={{ padding: 10, borderTop: '1px solid #1E293B', fontSize: 10.5, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Von Mises Stress:</span><strong style={{ color: '#F8FAFC' }}>{stressMpa} MPa</strong></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Strain Response:</span><strong style={{ color: '#38BDF8' }}>{strainMicro} µε</strong></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Displacement:</span><strong style={{ color: '#38BDF8' }}>{dispMm} mm</strong></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Utilization:</span><strong style={{ color: utilizationPct > 80 ? '#F4A62A' : '#16A36A' }}>{utilizationPct}%</strong></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Safety Factor:</span><strong style={{ color: safetyFactor >= 1.5 ? '#16A36A' : '#F4A62A' }}>{safetyFactor}</strong></div>
                   </div>
-                </div>
+                )}
+              </div>
 
-                <div className="panel" style={{ padding: 8, background: 'rgba(0,0,0,0.25)' }}>
-                  <span className="tiny faint">Fingerprint Reference Channels:</span>
-                  <div className="col" style={{ marginTop: 4, gap: 4 }}>
-                    {SENSORS.slice(0, 6).map((s) => (
-                      <div key={s.id} className="spread tiny mono">
-                        <span className="faint">{s.id} ({s.name})</span>
-                        <span style={{ color: 'var(--cyan)' }}>{s.baseline} {s.unit}</span>
+              {/* STEP 4: CAE CORRELATION */}
+              <div style={{ background: '#070B11', borderRadius: 8, border: testStep === 4 ? '1px solid #00A6D6' : '1px solid #1E293B', overflow: 'hidden' }}>
+                <button
+                  onClick={() => setTestStep(4)}
+                  style={{ width: '100%', padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: testStep === 4 ? 'rgba(0,166,214,0.15)' : 'transparent', border: 'none', cursor: 'pointer', color: '#F8FAFC' }}
+                >
+                  <span style={{ fontSize: 12, fontWeight: 800 }}>✓ 04 CAE CORRELATION</span>
+                  <span style={{ fontSize: 10, color: '#16A36A', fontWeight: 800 }}>98.4% Match</span>
+                </button>
+                {testStep === 4 && (
+                  <div style={{ padding: 10, borderTop: '1px solid #1E293B', fontSize: 10.5, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>CAE Stress:</span><span>148 MPa</span></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Test Stress:</span><span>150 MPa</span></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Difference:</span><strong style={{ color: '#16A36A' }}>+1.3%</strong></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Correlation Score:</span><strong style={{ color: '#16A36A' }}>98.4% Match</strong></div>
+                  </div>
+                )}
+              </div>
+
+              {/* STEP 5: DECISION */}
+              <div style={{ background: '#070B11', borderRadius: 8, border: testStep === 5 ? '1px solid #00A6D6' : '1px solid #1E293B', overflow: 'hidden' }}>
+                <button
+                  onClick={() => setTestStep(5)}
+                  style={{ width: '100%', padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: testStep === 5 ? 'rgba(0,166,214,0.15)' : 'transparent', border: 'none', cursor: 'pointer', color: '#F8FAFC' }}
+                >
+                  <span style={{ fontSize: 12, fontWeight: 800 }}>✓ 05 DECISION</span>
+                  <span style={{ fontSize: 10, color: thresholdState === 'CRITICAL' ? '#D83B3B' : '#16A36A', fontWeight: 800 }}>
+                    {thresholdState === 'CRITICAL' ? 'EVENT RECORDED' : 'VALIDATED'}
+                  </span>
+                </button>
+                {testStep === 5 && (
+                  <div style={{ padding: 10, borderTop: '1px solid #1E293B', fontSize: 10.5, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {thresholdState === 'CRITICAL' && (
+                      <div style={{ background: 'rgba(216,59,59,0.2)', border: '1px solid #D83B3B', padding: 8, borderRadius: 6, color: '#FF9999', fontWeight: 800, textAlign: 'center' }}>
+                        ⚠️ STRUCTURAL EVENT RECORDED
                       </div>
-                    ))}
+                    )}
+                    <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                      <button style={{ flex: 1, padding: 6, borderRadius: 4, background: '#059669', color: '#FFF', fontWeight: 800, border: 'none', cursor: 'pointer', fontSize: 11 }}>
+                        PASS
+                      </button>
+                      <button style={{ flex: 1, padding: 6, borderRadius: 4, background: '#D97706', color: '#FFF', fontWeight: 800, border: 'none', cursor: 'pointer', fontSize: 11 }}>
+                        RETEST
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
+
             </div>
           )}
         </div>
-      </div>
 
-      {/* Bottom Action Footer */}
-      <div
-        style={{
-          position: 'absolute',
-          bottom: 14,
-          left: 428,
-          right: 14,
-          zIndex: 2,
-          padding: '8px 14px',
-          background: 'rgba(12, 16, 21, 0.85)',
-          backdropFilter: 'blur(10px)',
-          border: '1px solid var(--line)',
-          borderRadius: 8,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 16,
-          pointerEvents: 'auto',
-        }}
-      >
-        <div className="row" style={{ gap: 8 }}>
-          <span className="tiny faint">Baseline B Status:</span>
-          <span className="chip" style={{ color: 'var(--green)' }}>✓ BASELINE B (STRUCTURAL COMMISSIONING) FROZEN</span>
+        {/* ------------------------------------------------------------
+            CENTER COLUMN: 3D VIEWPORT CANVAS (FLEXIBLE)
+            ------------------------------------------------------------ */}
+        <div style={{ position: 'relative', flex: 1, width: '100%', height: '100%', background: '#E8EDF3', overflow: 'hidden' }}>
+          
+          {/* 3D Scene bounded strictly inside viewport */}
+          <VehicleScene />
+
+          {/* ROW 4 THIN BOTTOM VIEWPORT TOOLBAR (MAX 42px) */}
+          <div
+            style={{
+              position: 'absolute',
+              bottom: 10,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 10,
+              height: 38,
+              padding: '0 12px',
+              background: 'rgba(17,26,36,0.92)',
+              backdropFilter: 'blur(8px)',
+              borderRadius: 8,
+              border: '1px solid rgba(0,166,214,0.4)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              color: '#FFFFFF',
+              fontSize: 11,
+              fontFamily: 'var(--mono)',
+            }}
+          >
+            <span style={{ color: '#94A3B8', fontWeight: 700 }}>RESULT:</span>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {(['stress', 'strain', 'displacement', 'loadpath'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setMetricMode(mode)}
+                  style={{
+                    padding: '3px 8px',
+                    borderRadius: 4,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    background: metricMode === mode ? '#00A6D6' : 'rgba(255,255,255,0.08)',
+                    color: '#FFFFFF',
+                    border: metricMode === mode ? '1px solid #38BDF8' : '1px solid transparent',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
+
+            <span style={{ color: '#94A3B8', fontWeight: 700, marginLeft: 6 }}>SCALE:</span>
+            {([1, 5, 10] as const).map((scale) => (
+              <button
+                key={scale}
+                onClick={() => setVisualDeformationScale(scale)}
+                style={{
+                  padding: '3px 8px',
+                  borderRadius: 4,
+                  fontSize: 10,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  background: visualDeformationScale === scale ? '#00A6D6' : 'rgba(255,255,255,0.08)',
+                  color: '#FFFFFF',
+                  border: visualDeformationScale === scale ? '1px solid #38BDF8' : '1px solid transparent',
+                }}
+              >
+                {scale === 1 ? '1× True' : `${scale}×`}
+              </button>
+            ))}
+
+            <span style={{ color: '#94A3B8', fontWeight: 700, marginLeft: 6 }}>OPACITY:</span>
+            <input
+              type="range"
+              min="0.0"
+              max="1.0"
+              step="0.05"
+              value={wireframeOpacity}
+              onChange={(e) => setWireframeOpacity(parseFloat(e.target.value))}
+              style={{ width: 70, accentColor: '#00A6D6', cursor: 'pointer' }}
+            />
+            <span style={{ fontWeight: 700, minWidth: 28, color: '#38BDF8' }}>{Math.round(wireframeOpacity * 100)}%</span>
+          </div>
+
         </div>
-        <button
-          className="btn"
-          onClick={() => navigate('road_corr')}
-          style={{ background: '#4f46e5', color: '#fff', fontWeight: 600, border: 'none' }}
-        >
-          Proceed to 04 Road Correlation →
-        </button>
+
+        {/* ------------------------------------------------------------
+            RIGHT RESULT PANEL (280px / 0px CLOSED)
+            ------------------------------------------------------------ */}
+        {!rightCollapsed && (
+          <div
+            style={{
+              width: 280,
+              background: '#111A24',
+              borderLeft: '1px solid #1E293B',
+              display: 'flex',
+              flexDirection: 'column',
+              padding: 12,
+              gap: 10,
+              color: '#E2E8F0',
+              fontFamily: 'var(--mono)',
+              overflowY: 'auto',
+              zIndex: 5,
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #1E293B', paddingBottom: 8 }}>
+              <span style={{ fontWeight: 800, fontSize: 12, color: '#38BDF8' }}>LIVE RESPONSE</span>
+              <button
+                onClick={() => setRightCollapsed(true)}
+                style={{ background: 'transparent', border: 'none', color: '#94A3B8', fontSize: 14, cursor: 'pointer' }}
+                title="Close Right Panel"
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 11 }}>
+              <div style={{ background: '#070B11', padding: 8, borderRadius: 6, border: '1px solid #1E293B' }}>
+                <div style={{ color: '#94A3B8', fontSize: 10 }}>APPLIED LOAD</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: '#F8FAFC', marginTop: 2 }}>{appliedLoadKn.toFixed(1)} kN</div>
+                <div style={{ fontSize: 10, color: '#38BDF8', marginTop: 1 }}>{targetComponent}</div>
+              </div>
+
+              <div style={{ background: '#070B11', padding: 8, borderRadius: 6, border: '1px solid #1E293B' }}>
+                <div style={{ color: '#94A3B8', fontSize: 10 }}>VON MISES STRESS</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: thresholdState === 'SAFE' ? '#16A36A' : thresholdState === 'WARNING' ? '#F4A62A' : '#D83B3B', marginTop: 2 }}>
+                  {stressMpa} MPa
+                </div>
+                <div style={{ fontSize: 9.5, color: '#64748B', marginTop: 1 }}>Strain: {strainMicro} µε | Disp: {dispMm} mm</div>
+              </div>
+
+              <div style={{ background: '#070B11', padding: 8, borderRadius: 6, border: '1px solid #1E293B' }}>
+                <div style={{ color: '#94A3B8', fontSize: 10 }}>THRESHOLD STATE</div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: thresholdState === 'SAFE' ? '#16A36A' : thresholdState === 'WARNING' ? '#F4A62A' : '#D83B3B', marginTop: 2 }}>
+                  ● {thresholdState}
+                </div>
+              </div>
+
+              <div style={{ background: '#070B11', padding: 8, borderRadius: 6, border: '1px solid #1E293B' }}>
+                <div style={{ color: '#94A3B8', fontSize: 10 }}>CAE CORRELATION</div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: '#16A36A', marginTop: 2 }}>98.4% MATCH</div>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );
