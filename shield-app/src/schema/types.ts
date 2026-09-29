@@ -415,6 +415,79 @@ export type PageKey =
   | 'reports'
   | 'settings';
 
+export interface LatchedStructuralEvent {
+  id: string;
+  timestamp: string;
+  hardpointId: string;
+  hardpointName: string;
+  peakLoadKn: number;
+  peakStressMpa: number;
+  yieldStressMpa: number;
+  severity: 'WARNING' | 'CRITICAL' | 'RECOVERY_WARNING' | 'ML_ANOMALY';
+  message: string;
+  requiresEngineerNote: boolean;
+  reviewedBy?: string;
+  reviewNote?: string;
+  clearedAt?: string;
+}
+
+export interface FeaDataset {
+  filename: string;
+  solver: 'ANSYS Mechanical v2024.R1' | 'Abaqus/Explicit' | 'NASTRAN';
+  meshNodesCount: number;
+  meshElementsCount: number;
+  peakVonMisesStressMpa: number;
+  maxDisplacementMm: number;
+  modalFrequenciesHz: number[];
+  contourLegendMinMpa: number;
+  contourLegendMaxMpa: number;
+  importedAt: string;
+}
+
+export interface MlPrediction {
+  anomalyScore: number;
+  confidence: number;
+  severity: 'NORMAL' | 'WARNING' | 'CRITICAL';
+  contributingFactors: string[];
+  yieldRiskPct: number;
+  fatigueLifeCyclesEst: number;
+  timestamp: string;
+  modelName: string;
+}
+
+export interface PhaseMetrics {
+  phase: ManualTestPhase;
+  loadKn: number;
+  stressMpa: number;
+  strainMicro: number;
+  dispMm: number;
+  timestamp: string;
+}
+
+export interface RetestRunConfig {
+  eventId: string;
+  hardpointId: string;
+  loadMode: 'force' | 'torque' | 'pressure' | 'cyclic';
+  loadType: ManualLoadType;
+  loadVector: [number, number, number];
+  targetLoad: number;
+  tempC: number;
+  step: 1 | 2 | 3 | 4 | 5 | 6;
+  rampPct: number;
+  status: 'IDLE' | 'RAMPING' | 'COMPLETED' | 'ABORTED';
+}
+
+export interface RetestComparison {
+  originalEvent: LatchedStructuralEvent;
+  originalRun: EngineeringTestRun;
+  retestRun: EngineeringTestRun;
+  deltaStressMpa: number;
+  deltaStrainMicro: number;
+  deltaDisplacementMm: number;
+  deltaResidualMicro: number;
+  recoveryImprovementPct: number;
+}
+
 /* ------------------------------------------------------------
    Data-source abstraction — the UI must not care whether data
    comes from the mock generator or physical hardware.

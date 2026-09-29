@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import * as THREE from 'three';
 import { useStore } from '../../store/useStore';
+import { HARDPOINT_PROFILES } from '../../data/hardpoints';
 import { Sel } from '../Sel';
 import { buildShellGeometry } from '../bodyShell';
 import { Cabin } from './Cabin';
@@ -146,17 +147,99 @@ function ProductionWheel({ position, side }: { position: [number, number, number
   );
 }
 
+function getContinuousFeaMaterial(normalizedScalar: number) {
+  const t = Math.max(0, Math.min(1.0, normalizedScalar));
+
+  let hex = '1e3a8a';
+  let emissiveHex = '#0f172a';
+  let emissiveIntensity = 0.15;
+
+  if (t < 0.15) {
+    const k = t / 0.15;
+    hex = new THREE.Color('#1e3a8a').lerp(new THREE.Color('#3b82f6'), k).getHexString();
+    emissiveHex = '#1e3a8a';
+    emissiveIntensity = 0.15 + k * 0.1;
+  } else if (t < 0.30) {
+    const k = (t - 0.15) / 0.15;
+    hex = new THREE.Color('#3b82f6').lerp(new THREE.Color('#06b6d4'), k).getHexString();
+    emissiveHex = '#0284c7';
+    emissiveIntensity = 0.2 + k * 0.1;
+  } else if (t < 0.45) {
+    const k = (t - 0.30) / 0.15;
+    hex = new THREE.Color('#06b6d4').lerp(new THREE.Color('#22c55e'), k).getHexString();
+    emissiveHex = '#042f2e';
+    emissiveIntensity = 0.25;
+  } else if (t < 0.65) {
+    const k = (t - 0.45) / 0.20;
+    hex = new THREE.Color('#22c55e').lerp(new THREE.Color('#eab308'), k).getHexString();
+    emissiveHex = '#451a03';
+    emissiveIntensity = 0.3 + k * 0.15;
+  } else if (t < 0.82) {
+    const k = (t - 0.65) / 0.17;
+    hex = new THREE.Color('#eab308').lerp(new THREE.Color('#f97316'), k).getHexString();
+    emissiveHex = '#7c2d12';
+    emissiveIntensity = 0.45 + k * 0.15;
+  } else {
+    const k = (t - 0.82) / 0.18;
+    hex = new THREE.Color('#f97316').lerp(new THREE.Color('#ef4444'), k).getHexString();
+    emissiveHex = '#991b1b';
+    emissiveIntensity = 0.6 + k * 0.4;
+  }
+
+  return {
+    color: '#' + hex,
+    emissive: emissiveHex,
+    emissiveIntensity,
+    metalness: 0.65,
+    roughness: 0.2,
+  };
+}
+
 /** Unibody Structural Frame & Battery Enclosure (Chassis & Transparent Modes) */
 function UnibodyFrame() {
+  const activeHardpointId = useStore((s) => s.activeHardpointId);
+  const manualAppliedForceN = useStore((s) => s.manualAppliedForceN);
+  const manualLoadVector = useStore((s) => s.manualLoadVector);
+  const manualDeformationScale = useStore((s) => s.manualDeformationScale);
+  const isDeformationAmplified = useStore((s) => s.isDeformationAmplified);
+
+  const profile = HARDPOINT_PROFILES[activeHardpointId] || HARDPOINT_PROFILES.front_rail_lh;
+  const forceKn = manualAppliedForceN / 1000;
+  const scaleK = isDeformationAmplified ? manualDeformationScale : 1;
+
+  // Calculate FEA spatial stress propagation for each chassis member
+  const isFrontRail = activeHardpointId === 'front_rail_lh' || activeHardpointId === 'front_rail_rh';
+  const isBattery = activeHardpointId === 'battery_enclosure';
+  const isStrut = activeHardpointId === 'shock_tower_fl';
+  const isCrossmember = activeHardpointId === 'floor_crossmember_1' || activeHardpointId === 'crossmember_front';
+
+  // Reduced-Order FEA Spatial Response Model (0.0 = Dark Blue, 1.0 = Peak Red Hotspot)
+  const normLoad = Math.min(1.0, forceKn / (profile.yieldForceLimitKn || 45));
+  const frontRailScalar = isFrontRail ? 1.0 * normLoad : isStrut ? 0.7 * normLoad : 0.22 * normLoad;
+  const batteryScalar = isBattery ? 1.0 * normLoad : isCrossmember ? 0.65 * normLoad : 0.2 * normLoad;
+  const sillScalar = isBattery ? 0.8 * normLoad : isCrossmember ? 0.75 * normLoad : isFrontRail ? 0.5 * normLoad : 0.28 * normLoad;
+  const crossmemberScalar = isCrossmember ? 1.0 * normLoad : isBattery ? 0.7 * normLoad : isFrontRail ? 0.45 * normLoad : 0.25 * normLoad;
+
+  const matFrontRail = getContinuousFeaMaterial(frontRailScalar);
+  const matBattery = getContinuousFeaMaterial(batteryScalar);
+  const matSideSills = getContinuousFeaMaterial(sillScalar);
+  const matCrossmembers = getContinuousFeaMaterial(crossmemberScalar);
+
+  const dX = (manualLoadVector[0] * (forceKn / 45) * 0.1 * scaleK);
+  const dY = (manualLoadVector[1] * (forceKn / 45) * 0.1 * scaleK);
+  const dZ = (manualLoadVector[2] * (forceKn / 45) * 0.1 * scaleK);
+
+  const frontRailOffset: [number, number, number] = isFrontRail ? [dX, dY, dZ] : [0, 0, 0];
+
   return (
     <group name="unibody-frame">
       {/* Side Sills (Left & Right Longitudinal Extrusions with Perforated Lightening Holes) */}
       {([-1, 1] as const).map((s) => (
         <Sel key={s} cid={s < 0 ? 'SideSills_L' : 'SideSills_R'}>
-          <group position={[s * 0.86, 0.38, 0]}>
+          <group position={[s * 0.86 + (isBattery ? dX * 0.5 : 0), 0.38 + (isBattery ? dY * 0.5 : 0), (isBattery ? dZ * 0.5 : 0)]}>
             <mesh castShadow receiveShadow>
               <boxGeometry args={[0.14, 0.18, 3.42]} />
-              <meshStandardMaterial {...UNIBODY_STEEL} />
+              <meshStandardMaterial {...matSideSills} />
             </mesh>
             {/* Machined Perforated Lightening Holes along side sills */}
             {[-1.4, -1.0, -0.6, -0.2, 0.2, 0.6, 1.0, 1.4].map((hz) => (
@@ -175,7 +258,7 @@ function UnibodyFrame() {
           <group position={[0, 0.38, z]}>
             <mesh castShadow receiveShadow>
               <boxGeometry args={[1.62, 0.12, 0.12]} />
-              <meshStandardMaterial {...UNIBODY_STEEL} />
+              <meshStandardMaterial {...matCrossmembers} />
             </mesh>
             {/* Bolted Flange Brackets connecting to Side Sills */}
             {([-1, 1] as const).map((s) => (
@@ -193,7 +276,7 @@ function UnibodyFrame() {
         {/* Main Tray */}
         <mesh position={[0, 0.32, -0.1]} castShadow receiveShadow>
           <boxGeometry args={[1.38, 0.16, 2.25]} />
-          <meshStandardMaterial color="#3a4454" metalness={0.8} roughness={0.3} />
+          <meshStandardMaterial {...matBattery} />
         </mesh>
         {/* Battery Top Sealed Cover */}
         <mesh position={[0, 0.41, -0.1]} castShadow>
@@ -227,37 +310,165 @@ function UnibodyFrame() {
         )}
       </Sel>
 
-      {/* Front Subframe Cradle & Suspension Towers */}
+      {/* Heavy High-Detail Front Subframe Cradle & Suspension Towers */}
       <Sel cid="FrontSubframe">
+        <group position={frontRailOffset}>
+          {/* Lower Subframe Cradle Box Structure */}
         <mesh position={[0, 0.36, 1.45]} castShadow receiveShadow>
           <boxGeometry args={[1.22, 0.14, 0.75]} />
-          <meshStandardMaterial {...UNIBODY_STEEL} />
+          <meshStandardMaterial {...matFrontRail} />
         </mesh>
-        {/* Perforated Front Crash Beams */}
-        {([-1, 1] as const).map((s) => (
-          <group key={s} position={[s * 0.52, 0.36, 1.82]}>
-            <mesh castShadow>
-              <boxGeometry args={[0.16, 0.14, 0.32]} />
-              <meshStandardMaterial {...UNIBODY_STEEL} />
+
+        {/* Heavy Front Bumper Transverse Impact Beam with Perforated Lightening Windows */}
+        <group position={[0, 0.42, 2.05]}>
+          <mesh castShadow receiveShadow>
+            <boxGeometry args={[1.68, 0.16, 0.12]} />
+            <meshStandardMaterial {...matFrontRail} />
+          </mesh>
+          {/* CNC Machined Perforated Circular Pockets along Front Bumper */}
+          {[-0.7, -0.5, -0.3, -0.1, 0.1, 0.3, 0.5, 0.7].map((bx) => (
+            <mesh key={bx} position={[bx, 0, 0.051]} rotation={[Math.PI / 2, 0, 0]}>
+              <cylinderGeometry args={[0.038, 0.038, 0.02, 16]} />
+              <meshStandardMaterial color="#141820" metalness={0.9} roughness={0.1} />
             </mesh>
-          </group>
-        ))}
-        {/* Front Suspension Strut Towers & Coil Springs */}
+          ))}
+        </group>
+
+        {/* Dual Progressive Crash Boxes & Mounting Flanges */}
         {([-1, 1] as const).map((s) => (
-          <group key={s} position={[s * 0.68, 0.62, 1.425]}>
-            <mesh castShadow>
-              <cylinderGeometry args={[0.11, 0.15, 0.48, 16]} />
-              <meshStandardMaterial {...UNIBODY_STEEL} />
+          <group key={s} position={[s * 0.58, 0.38, 1.75]}>
+            <mesh castShadow receiveShadow>
+              <boxGeometry args={[0.18, 0.16, 0.48]} />
+              <meshStandardMaterial {...matFrontRail} />
             </mesh>
-            {/* Coil Spring Overlay */}
-            {[ -0.16, -0.08, 0, 0.08, 0.16 ].map((cy) => (
-              <mesh key={cy} position={[0, cy, 0]}>
-                <torusGeometry args={[0.115, 0.015, 8, 20]} />
-                <meshStandardMaterial color="#1a202c" metalness={0.8} roughness={0.2} />
+            {/* Crash Box Corrugation Pockets */}
+            {[-0.15, 0, 0.15].map((pz) => (
+              <mesh key={pz} position={[0, 0, pz]}>
+                <boxGeometry args={[0.19, 0.17, 0.04]} />
+                <meshStandardMaterial color="#2d3748" metalness={0.85} roughness={0.2} />
               </mesh>
             ))}
           </group>
         ))}
+
+        {/* Transverse Subframe Cross Braces */}
+        <mesh position={[0, 0.48, 1.55]} rotation={[0, 0, 0]}>
+          <boxGeometry args={[1.18, 0.06, 0.08]} />
+          <meshStandardMaterial {...matFrontRail} />
+        </mesh>
+        <mesh position={[0, 0.34, 1.25]} rotation={[0, 0, 0]}>
+          <boxGeometry args={[1.28, 0.08, 0.1]} />
+          <meshStandardMaterial {...matFrontRail} />
+        </mesh>
+
+        {/* Front Steering Gear Housing & Tie Rods */}
+        <mesh position={[0, 0.32, 1.425]} rotation={[0, 0, Math.PI / 2]}>
+          <cylinderGeometry args={[0.045, 0.045, 1.25, 16]} />
+          <meshStandardMaterial color="#2d3748" metalness={0.9} roughness={0.2} />
+        </mesh>
+        {([-1, 1] as const).map((s) => (
+          <mesh key={s} position={[s * 0.72, 0.32, 1.425]} rotation={[0, 0, Math.PI / 2]}>
+            <cylinderGeometry args={[0.018, 0.018, 0.28, 12]} />
+            <meshStandardMaterial color="#d6deeb" metalness={0.95} roughness={0.15} />
+          </mesh>
+        ))}
+
+        {/* ---------------- ELECTRIC DRIVE MOTOR POWERTRAIN ASSEMBLY ---------------- */}
+        <Sel cid="DriveUnit_Front">
+          <group position={[0, 0.44, 1.45]}>
+            {/* PMSM Electric Motor Cylindrical Casing */}
+            <mesh rotation={[0, 0, Math.PI / 2]} castShadow receiveShadow>
+              <cylinderGeometry args={[0.18, 0.18, 0.44, 24]} />
+              <meshStandardMaterial color="#2a3240" metalness={0.88} roughness={0.2} />
+            </mesh>
+            {/* Motor Metallic Radiating Cooling Fins */}
+            {[-0.18, -0.12, -0.06, 0, 0.06, 0.12, 0.18].map((fx) => (
+              <mesh key={fx} position={[fx, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+                <torusGeometry args={[0.185, 0.008, 8, 24]} />
+                <meshStandardMaterial color="#4a5568" metalness={0.92} roughness={0.15} />
+              </mesh>
+            ))}
+            {/* Single-Speed Reduction Gearbox Housing */}
+            <mesh position={[-0.24, 0, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
+              <cylinderGeometry args={[0.22, 0.22, 0.12, 24]} />
+              <meshStandardMaterial color="#3a4454" metalness={0.9} roughness={0.25} />
+            </mesh>
+            {/* Power Electronics Inverter Box Unit */}
+            <mesh position={[0, 0.18, -0.04]} castShadow receiveShadow>
+              <boxGeometry args={[0.38, 0.14, 0.28]} />
+              <meshStandardMaterial color="#64748b" metalness={0.85} roughness={0.2} />
+            </mesh>
+            {/* Inverter Top High-Voltage Busbar Connectors */}
+            {[-0.12, 0, 0.12].map((bx) => (
+              <mesh key={bx} position={[bx, 0.26, -0.04]} rotation={[0, 0, Math.PI / 2]}>
+                <cylinderGeometry args={[0.022, 0.022, 0.04, 12]} />
+                <meshStandardMaterial color="#ff6600" emissive="#ff4400" emissiveIntensity={1.8} />
+              </mesh>
+            ))}
+          </group>
+          {/* Left & Right Front Drive CV Axle Shafts */}
+          {([-1, 1] as const).map((s) => (
+            <mesh key={s} position={[s * 0.52, 0.42, 1.45]} rotation={[0, 0, Math.PI / 2]} castShadow>
+              <cylinderGeometry args={[0.024, 0.024, 0.52, 16]} />
+              <meshStandardMaterial color="#1a202c" metalness={0.92} roughness={0.18} />
+            </mesh>
+          ))}
+        </Sel>
+
+        {/* High-Detail Front Suspension Shock Towers & Strut Assemblies */}
+        {([-1, 1] as const).map((s) => (
+          <group key={s} position={[s * 0.68, 0.62, 1.425]}>
+            {/* Strut Tower Cast Lattice Housing */}
+            <mesh castShadow receiveShadow>
+              <cylinderGeometry args={[0.13, 0.18, 0.52, 16]} />
+              <meshStandardMaterial {...UNIBODY_STEEL} />
+            </mesh>
+
+            {/* Machined Weight-Reduction Circular Cutouts on Shock Tower Shell */}
+            {[ -0.14, 0, 0.14 ].map((ty) => (
+              <mesh key={ty} position={[s * 0.135, ty, 0]} rotation={[0, 0, Math.PI / 2]}>
+                <cylinderGeometry args={[0.035, 0.035, 0.02, 16]} />
+                <meshStandardMaterial color="#1a202c" metalness={0.9} roughness={0.1} />
+              </mesh>
+            ))}
+
+            {/* Top Mounting Plate & Perimeter Bolt Heads */}
+            <mesh position={[0, 0.26, 0]} castShadow>
+              <cylinderGeometry args={[0.15, 0.15, 0.04, 16]} />
+              <meshStandardMaterial color="#3a4454" metalness={0.9} roughness={0.2} />
+            </mesh>
+            {Array.from({ length: 6 }).map((_, bi) => {
+              const ba = (bi * Math.PI) / 3;
+              return (
+                <mesh key={bi} position={[Math.cos(ba) * 0.11, 0.28, Math.sin(ba) * 0.11]}>
+                  <cylinderGeometry args={[0.012, 0.012, 0.02, 8]} />
+                  <meshStandardMaterial color="#d6deeb" metalness={0.95} roughness={0.1} />
+                </mesh>
+              );
+            })}
+
+            {/* Inner Hydraulic Damper Piston Shaft (Chrome) */}
+            <mesh position={[0, -0.02, 0]}>
+              <cylinderGeometry args={[0.035, 0.035, 0.44, 16]} />
+              <meshStandardMaterial color="#e2e8f0" metalness={0.98} roughness={0.08} />
+            </mesh>
+
+            {/* Stacked Concentric Coil Springs */}
+            {[-0.18, -0.1, -0.02, 0.06, 0.14].map((cy) => (
+              <mesh key={cy} position={[0, cy, 0]}>
+                <torusGeometry args={[0.118, 0.018, 10, 24]} />
+                <meshStandardMaterial color="#1a202c" metalness={0.85} roughness={0.2} />
+              </mesh>
+            ))}
+
+            {/* Diagonal Lattice Gusset Reinforcement Plates */}
+            <mesh position={[s * -0.08, -0.12, 0.12]} rotation={[0.3, s * 0.2, -0.4]}>
+              <boxGeometry args={[0.04, 0.28, 0.14]} />
+              <meshStandardMaterial {...UNIBODY_STEEL} />
+            </mesh>
+          </group>
+        ))}
+        </group>
       </Sel>
 
       {/* Rear Subframe Cradle & Suspension Towers */}

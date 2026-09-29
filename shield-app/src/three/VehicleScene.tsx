@@ -33,8 +33,8 @@ import { Fasteners } from './systems/Fasteners';
 import { Sensors } from './systems/Sensors';
 import { ShieldInstrumentBox } from './systems/ShieldBox';
 import { EXPLODE, ExplodedOverlays } from './ExplodedView';
+import { WorkbenchGizmos } from './WorkbenchGizmos';
 import { ProductionSuv } from './systems/ProductionSuv';
-import { WorkbenchGizmos } from './systems/WorkbenchGizmos';
 
 /* ------------------------------------------------------------
    Camera presets (earth axes, +z forward) — demo camera moves.
@@ -463,86 +463,145 @@ export function VehicleScene() {
   const cadView = useStore((s) => s.cadView);
   const explode = useStore((s) => s.explode);
   const autoRotate = useStore((s) => s.autoRotate);
+  const wireframeOpacity = useStore((s) => s.wireframeOpacity);
+  const setWireframeOpacity = useStore((s) => s.setWireframeOpacity);
 
   const isSkeletal = viewMode === 'skeletal';
   const glRenderer = useMemo(() => createRenderer, []);
 
   return (
-    <Canvas
-      dpr={[1, 1.5]}
-      camera={{ position: [5.5, 3.8, 5.5], fov: 42, near: 0.05, far: 140 }}
-      gl={glRenderer}
-      onPointerMissed={() => useStore.getState().clearSelection()}
-    >
-      <color attach="background" args={[isSkeletal ? (cadView ? '#f0f3f6' : '#ffffff') : '#e4e8ef']} />
-      <fog attach="fog" args={[isSkeletal ? (cadView ? '#f0f3f6' : '#ffffff') : '#e4e8ef', 22, 65]} />
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <Canvas
+        dpr={[1, 1.5]}
+        camera={{ position: [5.5, 3.8, 5.5], fov: 42, near: 0.05, far: 140 }}
+        gl={glRenderer}
+        onPointerMissed={() => useStore.getState().clearSelection()}
+      >
+        <color attach="background" args={[isSkeletal ? (cadView ? '#f0f3f6' : '#ffffff') : '#e4e8ef']} />
+        <fog attach="fog" args={[isSkeletal ? (cadView ? '#f0f3f6' : '#ffffff') : '#e4e8ef', 22, 65]} />
 
-      <ambientLight intensity={isSkeletal ? (cadView ? 0.7 : 0.8) : 0.9} />
-      <hemisphereLight args={['#ffffff', isSkeletal ? '#b9c0c5' : '#7f8c9d', 1.1]} />
-      <directionalLight
-        position={[5, 8, 4]}
-        intensity={isSkeletal ? (cadView ? 1.5 : 1.3) : 1.8}
-        castShadow
-        shadow-mapSize={[1024, 1024]}
-        shadow-camera-left={-7}
-        shadow-camera-right={7}
-        shadow-camera-top={7}
-        shadow-camera-bottom={-7}
-      />
-      <directionalLight position={[-5, 3, -4]} intensity={isSkeletal ? 0.6 : 0.8} color="#8fb8e8" />
-      <directionalLight position={[0, 1.5, 5]} intensity={isSkeletal ? 0.35 : 0.5} color="#ffe3c4" />
-      {/* soft contact shadow catcher under the assembly */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.62, 0]} receiveShadow>
-        <planeGeometry args={[40, 40]} />
-        <shadowMaterial opacity={isSkeletal ? 0.18 : 0.25} />
-      </mesh>
-
-      {/* procedural studio environment — no network assets */}
-      <SafeEnvironment>
-        <Environment resolution={128}>
-          <Lightformer intensity={1.5} position={[0, 6, 0]} scale={[9, 9, 1]} />
-          <Lightformer intensity={1.0} color="#d6e4ff" position={[-6, 1.5, -1]} rotation-y={Math.PI / 2} scale={[7, 2.5, 1]} />
-          <Lightformer intensity={1.0} color="#ffe2c6" position={[6, 1.5, 1]} rotation-y={-Math.PI / 2} scale={[7, 2.5, 1]} />
-          <Lightformer intensity={0.6} color="#9fb4c8" position={[0, 2.5, -7]} scale={[12, 4, 1]} />
-        </Environment>
-      </SafeEnvironment>
-
-      {!isSkeletal && (
-        <Grid
-          position={[0, 0.002, 0]}
-          cellSize={0.5}
-          cellThickness={0.6}
-          cellColor="#b0bcc9"
-          sectionSize={2.5}
-          sectionThickness={1.2}
-          sectionColor="#8898aa"
-          fadeDistance={28}
-          fadeStrength={2.2}
-          infiniteGrid
+        <ambientLight intensity={isSkeletal ? (cadView ? 0.7 : 0.8) : 0.9} />
+        <hemisphereLight args={['#ffffff', isSkeletal ? '#b9c0c5' : '#7f8c9d', 1.1]} />
+        <directionalLight
+          position={[5, 8, 4]}
+          intensity={isSkeletal ? (cadView ? 1.5 : 1.3) : 1.8}
+          castShadow
+          shadow-mapSize={[1024, 1024]}
+          shadow-camera-left={-7}
+          shadow-camera-right={7}
+          shadow-camera-top={7}
+          shadow-camera-bottom={-7}
         />
-      )}
+        <directionalLight position={[-5, 3, -4]} intensity={isSkeletal ? 0.6 : 0.8} color="#8fb8e8" />
+        <directionalLight position={[0, 1.5, 5]} intensity={isSkeletal ? 0.35 : 0.5} color="#ffe3c4" />
+        {/* soft contact shadow catcher under the assembly */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.62, 0]} receiveShadow>
+          <planeGeometry args={[40, 40]} />
+          <shadowMaterial opacity={isSkeletal ? 0.18 : 0.25} />
+        </mesh>
 
-      <OrbitControls
-        makeDefault
-        enableDamping
-        dampingFactor={0.08}
-        autoRotate={autoRotate}
-        autoRotateSpeed={1.5}
-        minDistance={0.7}
-        maxDistance={26}
-        target={[0, 0.72, 0]}
-      />
+        {/* procedural studio environment — no network assets */}
+        <SafeEnvironment>
+          <Environment resolution={128}>
+            <Lightformer intensity={1.5} position={[0, 6, 0]} scale={[9, 9, 1]} />
+            <Lightformer intensity={1.0} color="#d6e4ff" position={[-6, 1.5, -1]} rotation-y={Math.PI / 2} scale={[7, 2.5, 1]} />
+            <Lightformer intensity={1.0} color="#ffe2c6" position={[6, 1.5, 1]} rotation-y={-Math.PI / 2} scale={[7, 2.5, 1]} />
+            <Lightformer intensity={0.6} color="#9fb4c8" position={[0, 2.5, -7]} scale={[12, 4, 1]} />
+          </Environment>
+        </SafeEnvironment>
 
-      <group name="shield-vehicle" scale={[1.35, 1.35, 1.35]}>
-        {isSkeletal ? <VehicleAssembly cad={cadView} /> : <ProductionSuv />}
-      </group>
+        {!isSkeletal && (
+          <Grid
+            position={[0, 0.002, 0]}
+            cellSize={0.5}
+            cellThickness={0.6}
+            cellColor="#b0bcc9"
+            sectionSize={2.5}
+            sectionThickness={1.2}
+            sectionColor="#8898aa"
+            fadeDistance={28}
+            fadeStrength={2.2}
+            infiniteGrid
+          />
+        )}
 
-      {isSkeletal && (cadView && explode > 0.05 ? <ExplodedOverlays /> : <LoadPathArrows />)}
-      {isSkeletal && <ClipGizmos />}
-      <WorkbenchGizmos />
-      <CameraRig />
-      <FitRig />
-    </Canvas>
+        <OrbitControls
+          makeDefault
+          enableDamping
+          dampingFactor={0.08}
+          autoRotate={autoRotate}
+          autoRotateSpeed={1.5}
+          minDistance={0.7}
+          maxDistance={26}
+          target={[0, 0.72, 0]}
+        />
+
+        <group name="shield-vehicle" scale={[1.35, 1.35, 1.35]}>
+          {isSkeletal ? <VehicleAssembly cad={cadView} /> : <ProductionSuv />}
+        </group>
+
+        {isSkeletal && (cadView && explode > 0.05 ? <ExplodedOverlays /> : <LoadPathArrows />)}
+        {isSkeletal && <ClipGizmos />}
+        <WorkbenchGizmos />
+        <CameraRig />
+        <FitRig />
+      </Canvas>
+
+      {/* Floating Viewport HUD Control Pill for Wireframe Shell Opacity Adjustment */}
+      <div
+        style={{
+          position: 'absolute',
+          bottom: 16,
+          right: 16,
+          zIndex: 10,
+          background: 'rgba(12, 16, 22, 0.88)',
+          backdropFilter: 'blur(12px)',
+          border: '1px solid rgba(6, 182, 212, 0.4)',
+          borderRadius: 8,
+          padding: '8px 12px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
+          pointerEvents: 'auto',
+        }}
+      >
+        <span style={{ color: '#00e5ff', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          🔷 Shell Net Opacity
+        </span>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.01}
+          value={wireframeOpacity}
+          onChange={(e) => setWireframeOpacity(parseFloat(e.target.value))}
+          style={{ width: 110, height: 14, accentColor: '#00e5ff', cursor: 'pointer' }}
+        />
+        <span className="mono" style={{ color: '#67e8f9', fontSize: 11, fontWeight: 700, width: 36, textAlign: 'right' }}>
+          {Math.round(wireframeOpacity * 100)}%
+        </span>
+        <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.15)', margin: '0 2px' }} />
+        {[0, 0.25, 0.5, 0.75, 1].map((val) => (
+          <button
+            key={val}
+            onClick={() => setWireframeOpacity(val)}
+            style={{
+              padding: '2px 5px',
+              fontSize: 10,
+              fontWeight: 700,
+              borderRadius: 3,
+              background: Math.abs(wireframeOpacity - val) < 0.05 ? '#0891b2' : 'rgba(255,255,255,0.06)',
+              border: '1px solid ' + (Math.abs(wireframeOpacity - val) < 0.05 ? '#06b6d4' : 'rgba(255,255,255,0.12)'),
+              color: Math.abs(wireframeOpacity - val) < 0.05 ? '#fff' : '#94a3b8',
+              cursor: 'pointer',
+            }}
+          >
+            {Math.round(val * 100)}%
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -608,6 +667,9 @@ function VehicleAssembly({ cad = false }: { cad?: boolean }) {
           <ShieldInstrumentBox />
         </Offset>
       )}
+
+      {/* 3D Physics Workbench Force Vectors, Load Paths & Hotspots */}
+      <WorkbenchGizmos />
     </>
   );
 }

@@ -13,6 +13,12 @@ import type {
   ManualLoadState,
   ManualTestPhase,
   EngineeringTestRun,
+  LatchedStructuralEvent,
+  FeaDataset,
+  MlPrediction,
+  PhaseMetrics,
+  RetestRunConfig,
+  RetestComparison,
 } from '../schema/types';
 import { CATALOG, CATALOG_BY_ID, relatedIds, descendantsOf } from '../data/catalog';
 import { TIMELINE_DURATION, EVENTS, phaseAt } from '../data/scenarios';
@@ -198,6 +204,8 @@ interface Store {
   setActiveLifecycleStage: (s: LifecycleStage) => void;
 
   /* ---------------- manual engineering workbench ---------------- */
+  activeHardpointId: string;
+  setActiveHardpointId: (id: string) => void;
   manualSelectedLoadPointId: string | null;
   setManualSelectedLoadPointId: (id: string | null) => void;
   manualAppliedForceN: number;
@@ -214,6 +222,8 @@ interface Store {
   setManualLoadRamp: (r: 'instant' | 'linear' | 'smooth') => void;
   manualDeformationScale: number;
   setManualDeformationScale: (s: number) => void;
+  isDeformationAmplified: boolean;
+  setIsDeformationAmplified: (a: boolean) => void;
   manualTemperatureC: number;
   setManualTemperatureC: (t: number) => void;
   manualMaterialE: number;
@@ -224,6 +234,53 @@ interface Store {
   saveManualTestRun: (run: EngineeringTestRun) => void;
   resetManualInputs: () => void;
   returnToBaseline: () => void;
+
+  /* ---------------- latched events & alerts ---------------- */
+  latchedEvent: LatchedStructuralEvent | null;
+  latchedHistory: LatchedStructuralEvent[];
+  triggerLatchedEvent: (e: LatchedStructuralEvent) => void;
+  clearLatchedEventWithReview: (engineerName: string, note: string) => void;
+
+  /* ---------------- ANSYS FEA dataset ---------------- */
+  importedFeaData: FeaDataset | null;
+  feaOverlayMode: 'stress' | 'displacement' | 'mode_shape' | 'none';
+  importFeaDataset: (data: FeaDataset) => void;
+  clearFeaDataset: () => void;
+  setFeaOverlayMode: (m: 'stress' | 'displacement' | 'mode_shape' | 'none') => void;
+
+  /* ---------------- ML Model Integration ---------------- */
+  mlStatus: 'CONNECTED' | 'DISCONNECTED' | 'PREDICTING' | 'ERROR';
+  mlPrediction: MlPrediction | null;
+  setMlStatus: (st: 'CONNECTED' | 'DISCONNECTED' | 'PREDICTING' | 'ERROR') => void;
+  setMlPrediction: (p: MlPrediction | null) => void;
+
+  /* ---------------- Retest & Review Station & Panel Collapses ---------------- */
+  workbenchMode: 'workbench' | 'review_station';
+  setWorkbenchMode: (m: 'workbench' | 'review_station') => void;
+  loadMode: 'force' | 'torque' | 'pressure' | 'cyclic';
+  setLoadMode: (m: 'force' | 'torque' | 'pressure' | 'cyclic') => void;
+  contourMode: 'stress' | 'strain' | 'displacement' | 'load_path';
+  setContourMode: (m: 'stress' | 'strain' | 'displacement' | 'load_path') => void;
+  showAdvancedConditions: boolean;
+  setShowAdvancedConditions: (v: boolean) => void;
+  leftPanelCollapsed: boolean;
+  rightPanelCollapsed: boolean;
+  leftDrawerOpen: boolean;
+  rightDrawerOpen: boolean;
+  structuralOverlayEnabled: boolean;
+  toggleLeftPanel: () => void;
+  toggleRightPanel: () => void;
+  toggleLeftDrawer: () => void;
+  toggleRightDrawer: () => void;
+  closeDrawers: () => void;
+  setFullView: () => void;
+  toggleStructuralOverlay: () => void;
+  activeRetestConfig: RetestRunConfig | null;
+  retestComparison: RetestComparison | null;
+  startRetestSameCondition: (eventId: string) => void;
+  setRetestStep: (step: 1 | 2 | 3 | 4 | 5 | 6, rampPct?: number) => void;
+  setRetestComparison: (comp: RetestComparison | null) => void;
+  exitReviewStation: () => void;
 }
 
 const DEFAULT_OPACITY = 1;
@@ -511,6 +568,8 @@ export const useStore = create<Store>((set, get) => ({
   setActiveLifecycleStage: (s) => set({ activeLifecycleStage: s }),
 
   /* ---------------- manual engineering workbench ---------------- */
+  activeHardpointId: 'front_rail_lh',
+  setActiveHardpointId: (id) => set({ activeHardpointId: id }),
   manualSelectedLoadPointId: 'LP-FRONT-RAIL-L',
   setManualSelectedLoadPointId: (id) => set({ manualSelectedLoadPointId: id }),
   manualAppliedForceN: 15000,
@@ -525,8 +584,10 @@ export const useStore = create<Store>((set, get) => ({
   setManualLoadDurationS: (d) => set({ manualLoadDurationS: d }),
   manualLoadRamp: 'smooth',
   setManualLoadRamp: (r) => set({ manualLoadRamp: r }),
-  manualDeformationScale: 15,
+  manualDeformationScale: 10,
   setManualDeformationScale: (s) => set({ manualDeformationScale: s }),
+  isDeformationAmplified: true,
+  setIsDeformationAmplified: (a) => set({ isDeformationAmplified: a }),
   manualTemperatureC: 28.0,
   setManualTemperatureC: (t) => set({ manualTemperatureC: t }),
   manualMaterialE: 210,
@@ -552,6 +613,93 @@ export const useStore = create<Store>((set, get) => ({
       manualTemperatureC: 25.0,
       manualLoadVector: [0, -1, 0],
     }),
+
+  /* ---------------- latched events & alerts ---------------- */
+  latchedEvent: null,
+  latchedHistory: [],
+  triggerLatchedEvent: (e) => set((s) => ({
+    latchedEvent: e,
+    latchedHistory: [e, ...s.latchedHistory]
+  })),
+  clearLatchedEventWithReview: (engineerName, note) => set((s) => {
+    if (!s.latchedEvent) return s;
+    const cleared = { ...s.latchedEvent, reviewedBy: engineerName, reviewNote: note, clearedAt: new Date().toISOString() };
+    return {
+      latchedEvent: null,
+      latchedHistory: s.latchedHistory.map(item => item.id === cleared.id ? cleared : item)
+    };
+  }),
+
+  /* ---------------- ANSYS FEA dataset ---------------- */
+  importedFeaData: null,
+  feaOverlayMode: 'none',
+  importFeaDataset: (data) => set({ importedFeaData: data, feaOverlayMode: 'stress' }),
+  clearFeaDataset: () => set({ importedFeaData: null, feaOverlayMode: 'none' }),
+  setFeaOverlayMode: (m) => set({ feaOverlayMode: m }),
+
+  /* ---------------- ML Model Integration ---------------- */
+  mlStatus: 'CONNECTED',
+  mlPrediction: {
+    anomalyScore: 0.12,
+    confidence: 0.94,
+    severity: 'NORMAL',
+    contributingFactors: ['Front Rail Stress Nominal', 'Subframe Reaction Normal'],
+    yieldRiskPct: 8.5,
+    fatigueLifeCyclesEst: 1450000,
+    timestamp: new Date().toISOString(),
+    modelName: 'SHIELD-ML-STRUCT-V3'
+  },
+  setMlStatus: (st) => set({ mlStatus: st }),
+  setMlPrediction: (p) => set({ mlPrediction: p }),
+
+  /* ---------------- Retest & Review Station & Panel Collapses ---------------- */
+  workbenchMode: 'workbench',
+  setWorkbenchMode: (m) => set({ workbenchMode: m }),
+  loadMode: 'force',
+  setLoadMode: (m) => set({ loadMode: m }),
+  contourMode: 'stress',
+  setContourMode: (m) => set({ contourMode: m }),
+  showAdvancedConditions: false,
+  setShowAdvancedConditions: (v) => set({ showAdvancedConditions: v }),
+  leftPanelCollapsed: false,
+  rightPanelCollapsed: false,
+  leftDrawerOpen: false,
+  rightDrawerOpen: false,
+  structuralOverlayEnabled: true,
+  toggleLeftPanel: () => set((s) => ({ leftPanelCollapsed: !s.leftPanelCollapsed })),
+  toggleRightPanel: () => set((s) => ({ rightPanelCollapsed: !s.rightPanelCollapsed })),
+  toggleLeftDrawer: () => set((s) => ({ leftDrawerOpen: !s.leftDrawerOpen, rightDrawerOpen: false })),
+  toggleRightDrawer: () => set((s) => ({ rightDrawerOpen: !s.rightDrawerOpen, leftDrawerOpen: false })),
+  closeDrawers: () => set({ leftDrawerOpen: false, rightDrawerOpen: false }),
+  setFullView: () => set({ leftPanelCollapsed: true, rightPanelCollapsed: true, leftDrawerOpen: false, rightDrawerOpen: false }),
+  toggleStructuralOverlay: () => set((s) => ({ structuralOverlayEnabled: !s.structuralOverlayEnabled })),
+  activeRetestConfig: null,
+  retestComparison: null,
+  startRetestSameCondition: (eventId) => set((s) => {
+    const ev = s.latchedHistory.find(e => e.id === eventId) || s.latchedEvent;
+    const hpId = ev?.hardpointId || s.activeHardpointId;
+    return {
+      workbenchMode: 'review_station',
+      activeHardpointId: hpId,
+      activeRetestConfig: {
+        eventId: eventId,
+        hardpointId: hpId,
+        loadMode: s.loadMode,
+        loadType: s.manualLoadType,
+        loadVector: s.manualLoadVector,
+        targetLoad: s.manualAppliedForceN,
+        tempC: s.manualTemperatureC,
+        step: 1,
+        rampPct: 0,
+        status: 'RAMPING'
+      }
+    };
+  }),
+  setRetestStep: (step, rampPct = 0) => set((s) => ({
+    activeRetestConfig: s.activeRetestConfig ? { ...s.activeRetestConfig, step, rampPct } : null
+  })),
+  setRetestComparison: (comp) => set({ retestComparison: comp }),
+  exitReviewStation: () => set({ workbenchMode: 'workbench', activeRetestConfig: null }),
 }));
 
 /* Convenience selectors used across the UI */

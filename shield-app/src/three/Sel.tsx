@@ -54,6 +54,7 @@ export function Sel(props: { cid: string; children: ReactNode; passive?: boolean
   const layerOpacity = useStore((s) => s.layerOpacity[layer] ?? 1) as number;
   const xray = useStore((s) => s.xray);
   const wireframe = useStore((s) => s.wireframe);
+  const wireframeOpacity = useStore((s) => s.wireframeOpacity);
   const dimOthers = useStore((s) => s.dimOthers);
   const selectedArr = useStore((s) => s.selected);
   const hovered = useStore((s) => s.hovered);
@@ -142,8 +143,9 @@ export function Sel(props: { cid: string; children: ReactNode; passive?: boolean
       if (ghosted) t = Math.min(t, 0.16);
       if (xray) t = Math.min(t, selected || isHovered ? 1 : 0.13);
       if (dim) t *= 0.45;
-      m.transparent = t < 0.999;
-      m.opacity = Math.min(1, Math.max(0.02, t));
+      if (wireframe) t *= wireframeOpacity;
+      m.transparent = t < 0.999 || (wireframe && wireframeOpacity < 0.999);
+      m.opacity = Math.min(1, Math.max(0.0, t));
       m.depthWrite = !m.transparent && t >= 0.999;
       m.wireframe = wireframe;
 
@@ -164,7 +166,7 @@ export function Sel(props: { cid: string; children: ReactNode; passive?: boolean
       m.emissive.copy(_e);
       m.emissiveIntensity = ei;
     });
-  }, [cid, opacity, layerOpacity, ghosted, xray, selected, isHovered, wireframe, dimOthers, hasSelection, selectedArr, heat, heatmapMode]);
+  }, [cid, opacity, layerOpacity, ghosted, xray, selected, isHovered, wireframe, wireframeOpacity, dimOthers, hasSelection, selectedArr, heat, heatmapMode]);
 
   /* ------- pointer events (long-press for touch context menu) */
   const press = useRef<{ t: number; x: number; y: number } | null>(null);
