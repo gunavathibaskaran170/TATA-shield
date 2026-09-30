@@ -123,16 +123,72 @@ function round(n: number, d: number) {
   return Math.round(n * f) / f;
 }
 
-/* Auto-starts the demo: mock adapter → engine → store. Returns the adapter. */
+/* Auto-starts telemetry streams: connects HardwareStream + fallback MockStream. */
 import { MockStream } from './mock';
+import { hardwareStream, HardwareStream } from './hardwareStream';
+
+let activeStreamType: 'hardware' | 'mock' = 'hardware';
+let mockStreamInstance: MockStream | null = null;
+let engineInstance: AnalyticsEngine | null = null;
 let started = false;
+
+export function getAnalyticsEngine(): AnalyticsEngine {
+  if (!engineInstance) {
+    engineInstance = new AnalyticsEngine();
+  }
+  return engineInstance;
+}
+
+export function getHardwareStream(): HardwareStream {
+  return hardwareStream;
+}
+
+export function getActiveStreamType(): 'hardware' | 'mock' {
+  return activeStreamType;
+}
+
+export function setStreamAdapter(type: 'hardware' | 'mock') {
+  activeStreamType = type;
+  if (!engineInstance) return;
+
+  if (type === 'hardware') {
+    if (mockStreamInstance) {
+      mockStreamInstance.disconnect();
+    }
+    hardwareStream.connect();
+  } else {
+    hardwareStream.disconnect();
+    if (!mockStreamInstance) {
+      mockStreamInstance = new MockStream();
+      mockStreamInstance.onPacket((pkt) => engineInstance!.ingest(pkt));
+    }
+    mockStreamInstance.connect();
+  }
+}
 
 export function startShieldStream() {
   if (started) return;
   started = true;
-  const stream = new MockStream();
-  const engine = new AnalyticsEngine();
-  stream.onPacket((pkt) => engine.ingest(pkt));
-  stream.connect();
-  setInterval(() => engine.flush(), 240);
+  const engine = getAnalyticsEngine();
+
+  // Initialize both streams with ingestion callbacks
+  hardwareStream.onPacket((pkt) => {
+    if (activeStreamType === 'hardware') {
+      engine.ingest(pkt);
+    }
+  });
+
+  mockStreamInstance = new MockStream();
+  mockStreamInstance.onPacket((pkt) => {
+    if (activeStreamType === 'mock') {
+      engine.ingest(pkt);
+    }
+  });
+
+  // Start with hardware stream active (connects to ws://localhost:8765)
+  // Also start mock stream if hardware is offline so user has instant feedback
+  hardwareStream.connect();
+  mockStreamInstance.connect();
+
+  setInterval(() => engine.flush(), 200);
 }

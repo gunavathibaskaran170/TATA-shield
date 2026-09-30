@@ -12,6 +12,17 @@
 import { useState } from 'react';
 import { useStore } from '../store/useStore';
 import { VehicleScene } from '../three/VehicleScene';
+import { HardwareBenchScene3D } from '../three/HardwareBenchScene3D';
+import { hardwareStream } from '../dataflow/hardwareStream';
+import { HARDWARE_COMPONENTS, INITIAL_WIRES } from '../data/hardwareLayout';
+import type {
+  SensorTelemetry,
+  HardwareComponentMeta,
+  WireConnection,
+  WireRoutingMode,
+} from '../types/simulation';
+import { ComponentInspectorModal } from '../ui/modals/ComponentInspectorModal';
+import { ComponentLockValidationPanel } from '../ui/modals/ComponentLockValidationPanel';
 import { DESIGN_REVISIONS, CAE_LOAD_CASES } from '../data/engineering';
 import { CATALOG_BY_ID } from '../data/catalog';
 import type { CaeLoadCase, DesignRevision } from '../schema/types';
@@ -56,9 +67,50 @@ export function DigitalEngineering() {
   const [activeTab, setActiveTab] = useState<'cae' | 'revisions' | 'release'>('cae');
   const [solveProgressText, setSolveProgressText] = useState<string>('READY TO SOLVE');
 
+  // Unified Workspace View: Structure, Hardware Simul, or Dual Twin
+  const [workspaceMode, setWorkspaceMode] = useState<'structure' | 'hardware' | 'dual'>('structure');
+  const [selectedCompMeta, setSelectedCompMeta] = useState<HardwareComponentMeta | null>(null);
+  const [selectedWire, setSelectedWire] = useState<WireConnection | null>(null);
+  const [wires] = useState<WireConnection[]>(INITIAL_WIRES);
+  const [components] = useState<HardwareComponentMeta[]>(HARDWARE_COMPONENTS);
+  const [routingMode, setRoutingMode] = useState<WireRoutingMode>('ALIGNED_ORTHOGONAL');
+  const [showInspector, setShowInspector] = useState<boolean>(false);
+  const [showValidator, setShowValidator] = useState<boolean>(false);
+
   const activeRev = DESIGN_REVISIONS[currentRevision];
   const activeCae = CAE_LOAD_CASES[activeCaeLoadCase] || CAE_LOAD_CASES.battery_enclosure;
   const caeStatus = activeCae.safetyFactor >= 1.5 ? 'PASS' : 'REVIEW';
+
+  const hwMetrics = hardwareStream.currentMetrics;
+  const computedLoadKg = hwMetrics.weightKg > 0 ? hwMetrics.weightKg : (activeCae.peakStressMpa / 4.8);
+  const computedMicrostrain = hwMetrics.dynStressMpa > 0 ? hwMetrics.dynStressMpa * 14.5 : activeCae.peakStressMpa * 10;
+  const caeTelemetry: SensorTelemetry = {
+    timestamp: Date.now(),
+    strainMicroStrain: computedMicrostrain,
+    loadKg: computedLoadKg,
+    loadCell1Raw: Math.round(computedLoadKg * 1000),
+    loadCell2Raw: Math.round(computedLoadKg * 1000),
+    strainDeformationMm: activeCae.maxDeflectionMm,
+    accel: { x: 0, y: 0, z: hwMetrics.gForce || 1.0 },
+    gyro: { x: 0, y: 0, z: hwMetrics.gyroDps || 0 },
+    roll: hwMetrics.rollDeg || 0,
+    pitch: hwMetrics.pitchDeg || 0,
+    yaw: 0,
+    vibrationSensorDetected: hwMetrics.vibrationActive,
+    vibrationSensorRaw: hwMetrics.vibrationActive ? 1 : 0,
+    temperatureC: hwMetrics.chassisTempC > 0 ? hwMetrics.chassisTempC : 26.5,
+    vibrationMotorActive: caeState === 'RUNNING' || hwMetrics.vibrationActive,
+    vibrationDutyCycle: caeState === 'RUNNING' ? 220 : 0,
+    buzzerActive: caeState === 'RUNNING' && caeStep === 7,
+    buzzerFrequency: 2400,
+    ledGreen: caeStatus === 'PASS',
+    ledYellow: false,
+    ledRed: caeStatus !== 'PASS',
+    systemStatus: caeStatus === 'PASS' ? 'NORMAL' : 'WARNING',
+    activeScenario: 'NORMAL',
+    scenarioProgress: 0,
+    dataSource: hardwareStream.isConnected() ? 'REAL_HARDWARE' : 'SIMULATION',
+  };
 
   const selectedCompId = selected.length ? selected[selected.length - 1] : null;
   const selectedComp = selectedCompId ? CATALOG_BY_ID[selectedCompId] : null;
@@ -155,28 +207,91 @@ export function DigitalEngineering() {
         badge="STATIC STRUCTURAL"
         badgeType="default"
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 12, fontWeight: 500, color: '#94A3B8' }}>VIEW:</span>
-          <select
-            value={viewMode}
-            onChange={(e) => setViewMode(e.target.value as any)}
-            style={{
-              fontSize: 13,
-              fontWeight: 600,
-              padding: '6px 10px',
-              borderRadius: 6,
-              background: '#141b24',
-              border: '1px solid #273342',
-              color: '#F8FAFC',
-              cursor: 'pointer',
-              fontFamily: 'var(--font-sans)',
-            }}
-          >
-            <option value="chassis">Complete Vehicle / Chassis</option>
-            <option value="skeletal">Skeletal Frame Only</option>
-            <option value="body">Full Exterior Body</option>
-            <option value="transparent">Transparent Stress Overlay</option>
-          </select>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          {/* WORKSPACE MODE: STRUCTURE / HARDWARE SIMUL / DUAL TWIN */}
+          <div style={{ display: 'flex', gap: 3, background: '#141b24', padding: 3, borderRadius: 6, border: '1px solid #273342' }}>
+            <button
+              onClick={() => setWorkspaceMode('structure')}
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                padding: '4px 10px',
+                borderRadius: 4,
+                background: workspaceMode === 'structure' ? '#00A6D6' : 'transparent',
+                color: workspaceMode === 'structure' ? '#FFFFFF' : '#94A3B8',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5,
+              }}
+              title="Show 3D CAD/CAE Vehicle Structure"
+            >
+              🚗 Structure
+            </button>
+            <button
+              onClick={() => setWorkspaceMode('hardware')}
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                padding: '4px 10px',
+                borderRadius: 4,
+                background: workspaceMode === 'hardware' ? '#00A6D6' : 'transparent',
+                color: workspaceMode === 'hardware' ? '#FFFFFF' : '#94A3B8',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5,
+              }}
+              title="Show 3D Hardware Simulation Bench (ESP32 Twin)"
+            >
+              🔬 Hardware Bench
+            </button>
+            <button
+              onClick={() => setWorkspaceMode('dual')}
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                padding: '4px 10px',
+                borderRadius: 4,
+                background: workspaceMode === 'dual' ? '#00A6D6' : 'transparent',
+                color: workspaceMode === 'dual' ? '#FFFFFF' : '#94A3B8',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5,
+              }}
+              title="Dual Twin: Side-by-Side Vehicle Structure & Hardware Simulation"
+            >
+              ◫ Dual Twin
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 12, fontWeight: 500, color: '#94A3B8' }}>VIEW:</span>
+            <select
+              value={viewMode}
+              onChange={(e) => setViewMode(e.target.value as any)}
+              style={{
+                fontSize: 13,
+                fontWeight: 600,
+                padding: '6px 10px',
+                borderRadius: 6,
+                background: '#141b24',
+                border: '1px solid #273342',
+                color: '#F8FAFC',
+                cursor: 'pointer',
+                fontFamily: 'var(--font-sans)',
+              }}
+            >
+              <option value="chassis">Complete Vehicle / Chassis</option>
+              <option value="skeletal">Skeletal Frame Only</option>
+              <option value="body">Full Exterior Body</option>
+              <option value="transparent">Transparent Stress Overlay</option>
+            </select>
+          </div>
         </div>
 
         <button
@@ -533,10 +648,76 @@ export function DigitalEngineering() {
         {/* ============================================================
             CENTER COLUMN: 3D VIEWPORT CANVAS (STRICTLY BOUNDED TO REMAINING AREA)
             ============================================================ */}
-        <div style={{ position: 'relative', flex: 1, width: '100%', height: '100%', background: '#E9EEF5', overflow: 'hidden' }}>
+        <div style={{ position: 'relative', flex: 1, width: '100%', height: '100%', background: '#0B131E', overflow: 'hidden' }}>
           
-          {/* VehicleScene bounded strictly inside this viewport container */}
-          <VehicleScene />
+          {/* VIEW MODE 1: 3D CAD/CAE VEHICLE STRUCTURE */}
+          {workspaceMode === 'structure' && (
+            <div style={{ position: 'relative', width: '100%', height: '100%', background: '#E9EEF5' }}>
+              <VehicleScene />
+            </div>
+          )}
+
+          {/* VIEW MODE 2: 3D HARDWARE SIMULATION BENCH (ESP32 TWIN) */}
+          {workspaceMode === 'hardware' && (
+            <div style={{ position: 'relative', width: '100%', height: '100%', background: '#070B11' }}>
+              <HardwareBenchScene3D
+                telemetry={caeTelemetry}
+                viewMode="HARDWARE"
+                wires={wires}
+                components={components}
+                selectedComponent={selectedCompMeta}
+                selectedWire={selectedWire}
+                onSelectComponent={(comp) => {
+                  setSelectedCompMeta(comp);
+                  if (comp) setShowInspector(true);
+                }}
+                onSelectWire={setSelectedWire}
+                routingMode={routingMode}
+                onToggleRoutingMode={setRoutingMode}
+                onAlignWiring={() => setRoutingMode('ALIGNED_ORTHOGONAL')}
+                onOpenLockManager={() => setShowValidator(true)}
+              />
+            </div>
+          )}
+
+          {/* VIEW MODE 3: DUAL TWIN (STRUCTURE + HARDWARE SIMULATION SIDE-BY-SIDE) */}
+          {workspaceMode === 'dual' && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', width: '100%', height: '100%', background: '#0B131E' }}>
+              {/* LEFT HALF: 3D VEHICLE STRUCTURE */}
+              <div style={{ position: 'relative', width: '100%', height: '100%', borderRight: '2px solid #1E293B', overflow: 'hidden', background: '#E9EEF5' }}>
+                <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 10, background: 'rgba(13,23,36,0.92)', padding: '5px 12px', borderRadius: 6, border: '1px solid #00A6D6', fontSize: 11, fontWeight: 700, color: '#38BDF8', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#00A6D6' }} />
+                  🚗 3D VEHICLE STRUCTURE &amp; CAE STRESS
+                </div>
+                <VehicleScene />
+              </div>
+
+              {/* RIGHT HALF: 3D HARDWARE SIMULATION BENCH */}
+              <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: '#070B11' }}>
+                <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 10, background: 'rgba(13,23,36,0.92)', padding: '5px 12px', borderRadius: 6, border: '1px solid #00A6D6', fontSize: 11, fontWeight: 700, color: '#38BDF8', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#34D399' }} />
+                  🔬 3D HARDWARE SIMULATION BENCH (ESP32 TWIN)
+                </div>
+                <HardwareBenchScene3D
+                  telemetry={caeTelemetry}
+                  viewMode="HARDWARE"
+                  wires={wires}
+                  components={components}
+                  selectedComponent={selectedCompMeta}
+                  selectedWire={selectedWire}
+                  onSelectComponent={(comp) => {
+                    setSelectedCompMeta(comp);
+                    if (comp) setShowInspector(true);
+                  }}
+                  onSelectWire={setSelectedWire}
+                  routingMode={routingMode}
+                  onToggleRoutingMode={setRoutingMode}
+                  onAlignWiring={() => setRoutingMode('ALIGNED_ORTHOGONAL')}
+                  onOpenLockManager={() => setShowValidator(true)}
+                />
+              </div>
+            </div>
+          )}
 
           {/* ANSYS-STYLE VERTICAL CONTOUR LEGEND (SHOWN WHEN STEP 8 RESULTS IS ACTIVE) */}
           {caeStep === 8 && (
@@ -772,6 +953,55 @@ export function DigitalEngineering() {
         )}
 
       </div>
+
+      {/* SIMULATION MODALS */}
+      {showInspector && selectedCompMeta && (
+        <ComponentInspectorModal
+          component={selectedCompMeta}
+          telemetry={caeTelemetry}
+          onClose={() => {
+            setShowInspector(false);
+            setSelectedCompMeta(null);
+          }}
+        />
+      )}
+
+      {showValidator && (
+        <ComponentLockValidationPanel
+          components={components}
+          wires={wires}
+          lockedComponents={{
+            'breadboard': true,
+            'esp32-c3': true,
+            'hx711': true,
+            'load-cell-1': true,
+            'load-cell-2': true,
+            'load-cell-3': true,
+            'load-cell-4': true,
+            'load-cell-combiner': true,
+            'mpu6050': true,
+            'sw420': true,
+            'ds18b20': true,
+            'l298n': true,
+            'coin-motor': true,
+            'buzzer': true,
+            'traffic-leds': true,
+          }}
+          onToggleLock={() => {}}
+          onLockAll={() => {}}
+          onUnlockAll={() => {}}
+          routingMode={routingMode}
+          onToggleRoutingMode={setRoutingMode}
+          onFocusComponent={(compId) => {
+            const comp = components.find((c) => c.id === compId);
+            if (comp) {
+              setSelectedCompMeta(comp);
+              setShowInspector(true);
+            }
+          }}
+          onClose={() => setShowValidator(false)}
+        />
+      )}
     </div>
   );
 }

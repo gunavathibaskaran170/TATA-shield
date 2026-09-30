@@ -3,24 +3,26 @@ import { useStore } from '../store/useStore';
 import { SENSORS } from '../data/sensors';
 import { Card, ProvTag, Toggle, SliderRow } from '../ui/kit';
 import { PageHeader } from '../ui/PageHeader';
+import { setStreamAdapter, getActiveStreamType } from '../dataflow/engine';
+import { hardwareStream } from '../dataflow/hardwareStream';
 
 const SOURCES = [
   {
+    key: 'hardware',
+    name: 'Real Hardware / ESP32-C3 Gateway',
+    desc: 'Live telemetry stream from physical HX711 load cell, MPU6050 IMU, DS18B20 temp, and SW-420 on COM5 @ 115200 baud.',
+    live: true,
+  },
+  {
     key: 'mock',
-    name: 'Mock generator (synthetic telemetry)',
-    desc: 'Active demo feed — ~4 Hz per sensor, scenario-aware, shaped like an ESP32/MQTT stream.',
+    name: 'Mock Generator (Synthetic Telemetry)',
+    desc: 'Synthetic engineering telemetry feed — ~4 Hz per sensor, scenario-aware, shaped like an ESP32/MQTT stream.',
     live: true,
   },
   {
     key: 'mqtt',
-    name: 'MQTT bridge (broker)',
-    desc: 'Placeholder adapter. Implements the same DataSourceAdapter contract — pointing it at a broker requires no UI change.',
-    live: false,
-  },
-  {
-    key: 'hardware',
-    name: 'Hardware / WebSocket channel',
-    desc: 'Reserved for a telemetry gateway (e.g. ESP32 + strain gauge rig). Same packet contract on arrival.',
+    name: 'MQTT Bridge (Broker)',
+    desc: 'Placeholder MQTT broker adapter for cloud telemetry ingest.',
     live: false,
   },
 ] as const;
@@ -30,18 +32,25 @@ export function Settings() {
   const setScenario = useStore((s) => s.setScenario);
   const vehicleId = useStore((s) => s.vehicleId);
 
-  const [source, setSource] = useState<'mock' | 'mqtt' | 'hardware'>('mock');
+  const [source, setSource] = useState<'mock' | 'mqtt' | 'hardware'>(() => getActiveStreamType());
   const [tickMs, setTickMs] = useState(220);
   const [jitter, setJitter] = useState(0.018);
   const [packetLoss, setPacketLoss] = useState(0.02);
   const [unitsG, setUnitsG] = useState(false);
   const [showHiddenStats, setShowHiddenStats] = useState(true);
 
+  const handleSourceChange = (key: 'mock' | 'mqtt' | 'hardware') => {
+    setSource(key);
+    if (key === 'hardware' || key === 'mock') {
+      setStreamAdapter(key);
+    }
+  };
+
   return (
     <div className="col" style={{ width: '100%', minHeight: '100%', fontFamily: 'var(--font-sans)' }}>
       <PageHeader
         title="Settings & Data Sources"
-        description="Configure stream adapter contracts, simulation parameters, and display preferences."
+        description="Configure stream adapter contracts, hardware gateway endpoints, and simulation parameters."
       >
         <span className="chip"><span className="dot dot-normal" /> adapter: <b>{source}</b></span>
       </PageHeader>
@@ -60,13 +69,13 @@ export function Settings() {
                   borderLeft: `3px solid ${source === s.key ? (s.live ? 'var(--green)' : 'var(--amber)') : 'var(--line)'}`,
                   ...(source === s.key ? { background: '#101f28' } : {}),
                 }}
-                onClick={() => setSource(s.key)}
+                onClick={() => handleSourceChange(s.key as any)}
               >
                 <div className="spread">
                   <span className="small" style={{ fontWeight: 600 }}>{s.name}</span>
                   <span className={'chip ' + (s.live ? 'st-normal' : 'st-watch')}>
                     <span className={'dot ' + (s.live ? 'dot-normal' : 'dot-watch')} />
-                    {s.live ? 'LIVE' : 'PLACEHOLDER'}
+                    {s.key === 'hardware' ? (hardwareStream.isConnected() ? 'HARDWARE LIVE' : 'GATEWAY READY') : s.live ? 'LIVE' : 'PLACEHOLDER'}
                   </span>
                 </div>
                 <div className="tiny muted" style={{ marginTop: 3 }}>{s.desc}</div>
@@ -75,7 +84,7 @@ export function Settings() {
           </div>
           <div className="panel" style={{ marginTop: 8, padding: 8, background: 'var(--bg2)' }}>
             <div className="tiny faint">
-              Selecting MQTT/hardware here is a UI-only switch for this prototype — the mock feed keeps running. In production the selected adapter would replace the stream entirely.
+              Selecting <b>Real Hardware</b> routes all live digital twin models, 3D car strain heatmaps, and telemetry charts directly to your physical ESP32-C3 microcontroller.
             </div>
           </div>
         </Card>

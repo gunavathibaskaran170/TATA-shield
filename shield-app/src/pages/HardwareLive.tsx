@@ -1,597 +1,1141 @@
-/* ============================================================
-   SHIELD — HARDWARE LAYOUT, 3D TWIN & LIVE SERIAL TERMINAL
-   Features:
-   - 3D Interactive Breadboard & Circuit Model (React Three Fiber / Three.js)
-   - Official Schematic Wiring Diagram toggle mode
-   - Color-coded PIN CONNECTION SUMMARY panel
-   - Interactive Working Controls (Load Cell, WebAudio Buzzer, Motor, Temp, Gyro)
-   - Real-Time Hardware Serial Terminal Console (COM3 Gateway, Packet Stream, Command CLI)
-   ============================================================ */
-
-import { useState, useEffect, useRef } from 'react';
-import { useStore } from '../store/useStore';
-import { BreadboardScene, CameraPreset } from '../three/BreadboardScene';
-import { PageHeader } from '../ui/PageHeader';
+import React, { useState, useEffect, useRef } from 'react';
+import type {
+  SensorTelemetry,
+  ViewMode,
+  ImpactScenario,
+  HardwareComponentMeta,
+  WireConnection,
+  LoadCellWiringConfig,
+  ComponentLockState,
+  WireRoutingMode,
+  NavigationPage,
+  HardwareParameters,
+} from '../types/simulation';
+import {
+  SimulatedSensorDataProvider,
+  RealESP32SensorDataProvider,
+} from '../services/SensorDataProvider';
+import { HARDWARE_COMPONENTS, INITIAL_WIRES } from '../data/hardwareLayout';
+import { HardwareBenchScene3D } from '../three/HardwareBenchScene3D';
+import { Header } from '../components/dashboard/Header';
+import { TelemetryDashboard } from '../components/dashboard/TelemetryDashboard';
+import { BottomControls } from '../components/dashboard/BottomControls';
+import { ComponentInspectorModal } from '../ui/modals/ComponentInspectorModal';
+import { ComponentLockValidationPanel } from '../ui/modals/ComponentLockValidationPanel';
+import { ConnectionValidationModal } from '../ui/modals/ConnectionValidationModal';
+import { LoadCellConfigModal } from '../ui/modals/LoadCellConfigModal';
+import { RealHardwareModal } from '../ui/modals/RealHardwareModal';
+import { LiveHardwareDataPage } from '../components/pages/LiveHardwareDataPage';
+import { HardwareControlBenchPage } from '../components/pages/HardwareControlBenchPage';
+import { useTheme } from '../context/ThemeContext';
+import {
+  Maximize2,
+  Minimize2,
+  ChevronRight,
+  ChevronLeft,
+  Cpu,
+  Bell,
+  Zap,
+  Sparkles,
+  RotateCcw,
+  Lock,
+  Unlock,
+  X,
+  FileText,
+  Check,
+  AlertTriangle,
+} from 'lucide-react';
 
 export function HardwareLive() {
-  const navigate = useStore((s) => s.navigate);
-  const setViewMode = useStore((s) => s.setViewMode);
+  const { isDark } = useTheme();
 
-  // View Mode: '3d' (3D Interactive Model) or 'schematic' (Official 2D Layout Diagram)
-  const [viewStyle, setViewStyle] = useState<'3d' | 'schematic'>('3d');
-  const [activeModule, setActiveModule] = useState<string>('esp32c3');
-  const [cameraPreset, setCameraPreset] = useState<CameraPreset>('default');
-  const [autoRotate, setAutoRotate] = useState<boolean>(false);
-  const [showCallouts, setShowCallouts] = useState<boolean>(true);
+  // Data providers
+  const simProviderRef = useRef<SimulatedSensorDataProvider | null>(null);
+  const realProviderRef = useRef<RealESP32SensorDataProvider | null>(null);
+  const [activeProvider, setActiveProvider] = useState<'SIMULATION' | 'REAL_HARDWARE'>('SIMULATION');
 
-  // Working Hardware Test State
-  const [loadForceN, setLoadForceN] = useState<number>(380);
-  const [tempC, setTempC] = useState<number>(28.5);
-  const [pitchDeg, setPitchDeg] = useState<number>(1.2);
-  const [rollDeg, setRollDeg] = useState<number>(-0.4);
-  const [vibrationActive, setVibrationActive] = useState<boolean>(false);
-  const [buzzerBeeping, setBuzzerBeeping] = useState<boolean>(false);
-  const [tareStatus, setTareStatus] = useState<string>('Calibrated (Offset: 0.0 N)');
+  // Application state
+  const [telemetry, setTelemetry] = useState<SensorTelemetry>({
+    timestamp: Date.now(),
+    strainMicroStrain: 14,
+    loadKg: 25.0,
+    loadCell1Raw: 842100,
+    loadCell2Raw: 841950,
+    strainDeformationMm: 0.08,
+    accel: { x: 0.01, y: 0.02, z: 1.0 },
+    gyro: { x: 0.0, y: 0.0, z: 0.0 },
+    roll: 0.0,
+    pitch: 0.0,
+    yaw: 0.0,
+    vibrationSensorDetected: false,
+    vibrationSensorRaw: 0,
+    temperatureC: 24.8,
+    vibrationMotorActive: false,
+    vibrationDutyCycle: 0,
+    buzzerActive: false,
+    buzzerFrequency: 0,
+    ledGreen: true,
+    ledYellow: false,
+    ledRed: false,
+    systemStatus: 'NORMAL',
+    activeScenario: 'NORMAL',
+    scenarioProgress: 0,
+    dataSource: 'SIMULATION',
+  });
 
-  // Hardware Connection & Serial Terminal State
-  const [isConnected, setIsConnected] = useState<boolean>(true);
-  const [comPort, setComPort] = useState<string>('COM3');
-  const [baudRate, setBaudRate] = useState<number>(115200);
-  const [packetSeq, setPacketSeq] = useState<number>(2481);
-  const [commandInput, setCommandInput] = useState<string>('');
-  const [autoScroll, setAutoScroll] = useState<boolean>(true);
+  // Active Navigation Page (Live Data | Hardware Control & Testing | 3D Bench)
+  const [currentPage, setCurrentPage] = useState<NavigationPage>('BENCH_3D');
 
-  // Terminal Log Array
-  const [terminalLogs, setTerminalLogs] = useState<string[]>([
-    '[SYSTEM INIT] Hardware Gateway Services started.',
-    '[15:24:01.002] Scanning serial ports... Found COM3 (ESP32-C3 Dev Board).',
-    '[15:24:01.050] Connected to COM3 @ 115200 baud (Buffer: 4096 bytes).',
-    '[15:24:01.120] TX: {"cmd":"PING"} -> RX: {"status":"ACK", "firmware":"v2.4.1-SHIELD"}',
-    '[15:24:02.000] RX #2480: {"device":"ESP32-C3","strain_N":380.0,"temp_C":28.5,"led":"GREEN"}',
-  ]);
+  // Dynamic Hardware Calibration & Safety Threshold Parameters
+  const [hardwareParams, setHardwareParams] = useState<HardwareParameters>({
+    baseWeightKg: 0,
+    simulatedAppliedPressureKg: 0,
+    tempOverrideC: null,
+    threshWeightWarnKg: 30,
+    threshWeightCritKg: 50,
+    threshTempWarnC: 38,
+    threshTempCritC: 45,
+    threshRollWarpDeg: 25,
+  });
 
-  const terminalBoxRef = useRef<HTMLDivElement>(null);
+  const [rawLogs, setRawLogs] = useState<string[]>([]);
+  const [isRunning, setIsRunning] = useState<boolean>(true);
+  const [activeScenario, setActiveScenario] = useState<ImpactScenario>('NORMAL');
+  const [viewMode] = useState<ViewMode>('HARDWARE');
 
-  // Auto-scroll terminal box internal container only (NEVER scrolls browser window)
-  useEffect(() => {
-    if (autoScroll && terminalBoxRef.current) {
-      terminalBoxRef.current.scrollTop = terminalBoxRef.current.scrollHeight;
-    }
-  }, [terminalLogs, autoScroll]);
+  // Interactive selection
+  const [wires, setWires] = useState<WireConnection[]>(INITIAL_WIRES);
+  const [components] = useState<HardwareComponentMeta[]>(HARDWARE_COMPONENTS);
+  const [selectedComponent, setSelectedComponent] = useState<HardwareComponentMeta | null>(null);
+  const [selectedWire, setSelectedWire] = useState<WireConnection | null>(null);
 
-  // Live Hardware Telemetry Packet Simulation Loop when Connected
-  useEffect(() => {
-    if (!isConnected) return;
-    const interval = setInterval(() => {
-      setPacketSeq((s) => s + 1);
-      const now = new Date().toLocaleTimeString();
-      const newLog = `[${now}] RX #${packetSeq + 1}: {"force_N":${loadForceN.toFixed(1)},"temp_C":${tempC.toFixed(1)},"pitch":${pitchDeg},"roll":${rollDeg},"status":"${loadForceN > 1200 ? 'CRITICAL' : loadForceN > 500 ? 'CAUTION' : 'NORMAL'}"}`;
-      setTerminalLogs((prev) => [...prev.slice(-80), newLog]);
-    }, 1200);
+  // Component Lock & Axis Rigidity Control
+  const [lockedComponents, setLockedComponents] = useState<ComponentLockState>({
+    'breadboard': true,
+    'esp32-c3': true,
+    'hx711': true,
+    'load-cell-1': true,
+    'load-cell-2': true,
+    'load-cell-3': true,
+    'load-cell-4': true,
+    'load-cell-combiner': true,
+    'mpu6050': true,
+    'sw420': true,
+    'ds18b20': true,
+    'l298n': true,
+    'coin-motor': true,
+    'buzzer': true,
+    'traffic-leds': true,
+  });
 
-    return () => clearInterval(interval);
-  }, [isConnected, packetSeq, loadForceN, tempC, pitchDeg, rollDeg]);
+  // Wire routing geometry mode: Tight optimal Bézier vs lab sag slack
+  const [routingMode, setRoutingMode] = useState<WireRoutingMode>('ALIGNED_ORTHOGONAL');
+  const [isTracingConnections, setIsTracingConnections] = useState<boolean>(false);
 
-  // Web Audio Synthesizer Piezo Beep
-  const triggerBuzzerAudio = (freq = 880, durationMs = 200) => {
-    setBuzzerBeeping(true);
-    setTimeout(() => setBuzzerBeeping(false), durationMs);
-    try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioCtx) return;
-      const ctx = new AudioCtx();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'square';
-      osc.frequency.setValueAtTime(freq, ctx.currentTime);
-      gain.gain.setValueAtTime(0.12, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + durationMs / 1000);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + durationMs / 1000);
-    } catch {
-      // Ignore audio policy restrictions
-    }
+  // Lock toggles
+  const handleToggleLock = (id: string) => {
+    setLockedComponents((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
   };
 
-  // Trigger Vibration Motor
-  const triggerVibrationMotor = () => {
-    setVibrationActive(true);
-    setTimeout(() => setVibrationActive(false), 1200);
+  const handleLockAll = () => {
+    setLockedComponents({
+      'breadboard': true,
+      'esp32-c3': true,
+      'hx711': true,
+      'load-cell-1': true,
+      'load-cell-2': true,
+      'load-cell-3': true,
+      'load-cell-4': true,
+      'load-cell-combiner': true,
+      'mpu6050': true,
+      'sw420': true,
+      'ds18b20': true,
+      'l298n': true,
+      'coin-motor': true,
+      'buzzer': true,
+      'traffic-leds': true,
+    });
   };
 
-  // Zero Tare Handler
-  const handleTare = () => {
-    setTareStatus('Tare executing...');
-    const now = new Date().toLocaleTimeString();
-    setTerminalLogs((prev) => [...prev, `[${now}] TX: {"cmd":"TARE"} -> Executing Load Cell Zero Calibration...`]);
+  const handleUnlockAll = () => {
+    setLockedComponents({
+      'breadboard': false,
+      'esp32-c3': false,
+      'hx711': false,
+      'load-cell-1': false,
+      'load-cell-2': false,
+      'load-cell-3': false,
+      'load-cell-4': false,
+      'load-cell-combiner': false,
+      'mpu6050': false,
+      'sw420': false,
+      'ds18b20': false,
+      'l298n': false,
+      'coin-motor': false,
+      'buzzer': false,
+      'traffic-leds': false,
+    });
+  };
+
+  const handleRunLiveTrace = () => {
+    setIsTracingConnections(true);
     setTimeout(() => {
-      setLoadForceN(0);
-      setTareStatus('Zero Tare Complete (Offset: 0.0 N)');
-      setTerminalLogs((prev) => [...prev, `[${now}] RX: {"status":"TARE_OK", "zero_offset_N":0.0}`]);
-    }, 600);
+      setIsTracingConnections(false);
+    }, 1800);
   };
 
-  // Send Command CLI Handler
-  const handleSendCommand = () => {
-    if (!commandInput.trim()) return;
-    const cmd = commandInput.trim().toUpperCase();
-    const now = new Date().toLocaleTimeString();
-    setTerminalLogs((prev) => [...prev, `[${now}] TX COMMAND: > ${cmd}`]);
-    setCommandInput('');
+  // Modals
+  const [activeModal, setActiveModal] = useState<'INSPECTOR' | 'VALIDATOR' | 'LOAD_CELL_CONFIG' | 'REAL_HARDWARE' | 'CIRCUIT_VALIDATOR' | null>(null);
 
-    // Process Command Logic
-    setTimeout(() => {
-      if (cmd === 'TARE') {
-        handleTare();
-      } else if (cmd === 'BUZZER' || cmd === 'BEEP') {
-        triggerBuzzerAudio(880, 250);
-        setTerminalLogs((prev) => [...prev, `[${now}] RX: {"status":"BUZZER_ACK", "duration_ms":250}`]);
-      } else if (cmd === 'VIBRATE' || cmd === 'MOTOR') {
-        triggerVibrationMotor();
-        setTerminalLogs((prev) => [...prev, `[${now}] RX: {"status":"MOTOR_PWM_ACTIVE", "duty":100}`]);
-      } else if (cmd.startsWith('FORCE=')) {
-        const val = parseFloat(cmd.replace('FORCE=', ''));
-        if (!isNaN(val)) {
-          setLoadForceN(val);
-          setTerminalLogs((prev) => [...prev, `[${now}] RX: {"status":"FORCE_SET_OK", "force_N":${val}}`]);
-        }
-      } else {
-        setTerminalLogs((prev) => [...prev, `[${now}] RX: {"status":"OK", "result":"Executed ${cmd}"}`]);
+  // Load cell configurable mapping
+  const [loadCellConfig, setLoadCellConfig] = useState<LoadCellWiringConfig>({
+    ePlusColor: 'Red (#ef4444)',
+    eMinusColor: 'Black (#1e293b)',
+    aPlusColor: 'Twisted Black (#334155)',
+    aMinusColor: 'Twisted White (#e2e8f0)',
+  });
+
+  const activeProviderRef = useRef<'SIMULATION' | 'REAL_HARDWARE'>('SIMULATION');
+
+  useEffect(() => {
+    activeProviderRef.current = activeProvider;
+  }, [activeProvider]);
+
+  // Initialize providers once on mount
+  useEffect(() => {
+    const sim = new SimulatedSensorDataProvider();
+    const real = new RealESP32SensorDataProvider();
+    simProviderRef.current = sim;
+    realProviderRef.current = real;
+
+    const unsubSim = sim.subscribe((data) => {
+      if (activeProviderRef.current === 'SIMULATION') {
+        setTelemetry(data);
       }
-    }, 150);
+    });
+
+    const unsubReal = real.subscribe((data) => {
+      if (real.isConnected) {
+        if (activeProviderRef.current !== 'REAL_HARDWARE') {
+          activeProviderRef.current = 'REAL_HARDWARE';
+          setActiveProvider('REAL_HARDWARE');
+        }
+        setTelemetry(data);
+      }
+    });
+
+    const unsubLogs = real.subscribeLogs((line) => {
+      setRawLogs((prev) => [...prev.slice(-80), line]);
+    });
+
+    return () => {
+      unsubSim();
+      unsubReal();
+      unsubLogs();
+      sim.pause();
+    };
+  }, []);
+
+  // Hardware Parameter Handlers (Base Weight, Temperature, Thresholds)
+  const handleSetBaseWeight = async (weightKg: number): Promise<boolean> => {
+    setHardwareParams((prev) => ({ ...prev, baseWeightKg: weightKg }));
+    if (activeProvider === 'REAL_HARDWARE' && realProviderRef.current) {
+      return realProviderRef.current.setHardwareBaseWeight(weightKg);
+    } else if (simProviderRef.current) {
+      return simProviderRef.current.setHardwareBaseWeight(weightKg);
+    }
+    return true;
   };
 
-  // Compute LED State
-  const ledState = loadForceN > 1200 ? 'RED' : loadForceN > 500 ? 'YELLOW' : 'GREEN';
-
-  // Automatically trigger alerts on red critical strain
-  useEffect(() => {
-    if (loadForceN > 1200) {
-      triggerBuzzerAudio(1046, 300);
-      setVibrationActive(true);
+  const handleSetTemperature = async (tempC: number | null): Promise<boolean> => {
+    setHardwareParams((prev) => ({ ...prev, tempOverrideC: tempC }));
+    if (activeProvider === 'REAL_HARDWARE' && realProviderRef.current) {
+      return realProviderRef.current.setHardwareTemperature(tempC);
+    } else if (simProviderRef.current) {
+      return simProviderRef.current.setHardwareTemperature(tempC);
     }
-  }, [loadForceN]);
+    return true;
+  };
 
-  return (
-    <div className="hardware-live-page" style={{ position: 'relative', width: '100%', height: '100%', overflowX: 'hidden', overflowY: 'auto', background: '#070b11', color: '#e2e8f0', padding: 16, display: 'flex', flexDirection: 'column', gap: 16, fontFamily: 'var(--font-sans)' }}>
-      
-      <PageHeader
-        title="Hardware Layout & Serial Gateway"
-        description="Interactive 3D Circuit & ESP32-C3 Microcontroller · Official 2D Schematic · Real-Time Serial Console"
-        actions={
-          <div className="row gap-2">
-            <span className={`px-2 py-1 rounded text-[11px] font-semibold ${isConnected ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-700/50' : 'bg-red-950/80 text-red-400 border border-red-700/50'}`}>
-              {isConnected ? '● HARDWARE CONNECTED' : '○ DISCONNECTED'}
-            </span>
-            <div className="row gap-1 p-1 bg-slate-900 border border-slate-800 rounded-lg">
-              <button
-                className={`btn tiny ${viewStyle === '3d' ? 'active' : ''}`}
-                onClick={() => setViewStyle('3d')}
-              >
-                🎲 3D Interactive
-              </button>
-              <button
-                className={`btn tiny ${viewStyle === 'schematic' ? 'active' : ''}`}
-                onClick={() => setViewStyle('schematic')}
-              >
-                📐 2D Schematic
-              </button>
-            </div>
+  const handleSetThresholds = async (params: Partial<HardwareParameters>): Promise<boolean> => {
+    setHardwareParams((prev) => ({ ...prev, ...params }));
+    if (activeProvider === 'REAL_HARDWARE' && realProviderRef.current) {
+      return realProviderRef.current.setHardwareThresholds(params);
+    } else if (simProviderRef.current) {
+      return simProviderRef.current.setHardwareThresholds(params);
+    }
+    return true;
+  };
 
-            <button
-              className="btn tiny"
-              onClick={handleTare}
-              style={{ background: 'rgba(255,255,255,0.06)', color: '#38bdf8', border: '1px solid rgba(56,189,248,0.3)', fontWeight: 600 }}
-            >
-              ⚖ ZERO TARE
-            </button>
-            <button
-              className="btn tiny"
-              onClick={() => {
-                navigate('twin');
-                setViewMode('chassis');
-              }}
-              style={{ background: '#0284c7', color: '#fff', fontWeight: 600 }}
-            >
-              🚘 3D VEHICLE TWIN →
-            </button>
-          </div>
-        }
-      />
+  const handleResetParameters = async (): Promise<boolean> => {
+    const defaults: HardwareParameters = {
+      baseWeightKg: 0,
+      simulatedAppliedPressureKg: 0,
+      tempOverrideC: null,
+      threshWeightWarnKg: 30,
+      threshWeightCritKg: 50,
+      threshTempWarnC: 38,
+      threshTempCritC: 45,
+      threshRollWarpDeg: 25,
+    };
+    setHardwareParams(defaults);
+    if (activeProvider === 'REAL_HARDWARE' && realProviderRef.current) {
+      return realProviderRef.current.resetHardwareParameters();
+    } else if (simProviderRef.current) {
+      return simProviderRef.current.resetHardwareParameters();
+    }
+    return true;
+  };
 
-      {/* ============================================================
-          MAIN 2-COLUMN HARDWARE WORKSTATION (3D/2D CANVAS + PIN SUMMARY)
-          ============================================================ */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        
-        {/* LEFT 8 COLUMNS: 3D / 2D HARDWARE WORKSPACE CANVAS */}
-        <div className="lg:col-span-8 flex flex-col gap-3">
-          <div className="panel p-3 bg-slate-950/90 border border-cyan-500/40 rounded-xl col gap-3 relative shadow-2xl overflow-hidden" style={{ minHeight: 440 }}>
-            
-            <div className="spread">
-              <div className="row gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping" />
-                <span className="tiny font-bold text-cyan-300 uppercase tracking-wider">
-                  {viewStyle === '3d' ? '3D INTERACTIVE HARDWARE & BREADBOARD MODEL (ORBIT, ROTATE & CLICK)' : '2D OFFICIAL WIRING DIAGRAM & SCHEMATIC'}
+  const handleSetSimulatedPressure = (pressureKg: number) => {
+    setHardwareParams((prev) => ({ ...prev, simulatedAppliedPressureKg: pressureKg }));
+    if (activeProvider === 'REAL_HARDWARE' && realProviderRef.current) {
+      realProviderRef.current.setSimulatedAppliedPressure(pressureKg);
+    } else if (simProviderRef.current) {
+      simProviderRef.current.setSimulatedAppliedPressure(pressureKg);
+    }
+  };
+
+  // Simulation Controls Handlers
+  const handleStart = () => {
+    setIsRunning(true);
+    if (activeProvider === 'SIMULATION' && simProviderRef.current) {
+      simProviderRef.current.start();
+    }
+  };
+
+  const handlePause = () => {
+    setIsRunning(false);
+    if (activeProvider === 'SIMULATION' && simProviderRef.current) {
+      simProviderRef.current.pause();
+    }
+  };
+
+  const handleReset = () => {
+    setActiveScenario('NORMAL');
+    setIsRunning(true);
+    if (activeProvider === 'SIMULATION' && simProviderRef.current) {
+      simProviderRef.current.reset();
+      simProviderRef.current.start();
+    }
+  };
+
+  const handleSelectScenario = (scenario: ImpactScenario) => {
+    setActiveScenario(scenario);
+    if (activeProvider === 'SIMULATION' && simProviderRef.current) {
+      simProviderRef.current.setScenario(scenario);
+    }
+  };
+
+  const handleOpenInspector = (comp: HardwareComponentMeta | null) => {
+    setSelectedComponent(comp);
+    if (comp) {
+      setActiveModal('INSPECTOR');
+    }
+  };
+
+  // Sidebar visibility toggle for clean view
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
+  const [isControlSlideBarOpen, setIsControlSlideBarOpen] = useState<boolean>(true);
+  const [isFullScreen, setIsFullScreen] = useState<boolean>(false);
+
+  const handleToggleFullScreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement
+        .requestFullscreen()
+        .then(() => {
+          setIsFullScreen(true);
+        })
+        .catch(() => {
+          setIsFullScreen((prev) => !prev);
+        });
+    } else {
+      if (document.exitFullscreen) {
+        document
+          .exitFullscreen()
+          .then(() => {
+            setIsFullScreen(false);
+          })
+          .catch(() => {
+            setIsFullScreen(false);
+          });
+      }
+    }
+  };
+
+  useEffect(() => {
+    const handleFsChange = () => {
+      setIsFullScreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener('fullscreenchange', handleFsChange);
+    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+  }, []);
+
+  // Hardware Remote Actuator Control Handler
+  const handleHardwareControl = async (command: string) => {
+    if (realProviderRef.current) {
+      await realProviderRef.current.sendCommand(command);
+    }
+  };
+
+  // Helper to render live real-time values & interactive hardware controls for the clicked component
+  const renderLiveTelemetryForComponent = (comp: HardwareComponentMeta) => {
+    const cardBg = isDark ? 'bg-slate-950/90 border-cyan-500/40' : 'bg-white border-slate-300 shadow-xs';
+    const subCardBg = isDark ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-50 border-slate-200';
+    const textMuted = isDark ? 'text-slate-400' : 'text-slate-500';
+    const textHeading = isDark ? 'text-white' : 'text-slate-900';
+
+    switch (comp.id) {
+      case 'sw420':
+        return (
+          <div className="space-y-2">
+            <div className={`p-2 rounded-lg border text-[11px] font-mono space-y-1.5 ${cardBg}`}>
+              <div className="flex justify-between items-center">
+                <span className={`${textMuted} text-[10px] flex items-center gap-1`}><Zap className="w-3 h-3 text-cyan-400" /> SHOCK SENSOR:</span>
+                <span
+                  className={`font-bold text-xs ${
+                    telemetry.vibrationSensorDetected ? 'text-rose-500 animate-pulse' : 'text-emerald-500'
+                  }`}
+                >
+                  {telemetry.vibrationSensorDetected ? 'TRIGGERED (SHOCK)' : 'IDLE (NOMINAL)'}
                 </span>
               </div>
-              <span className="tiny mono text-slate-400">SELECTED: {activeModule.toUpperCase()}</span>
-            </div>
-
-            {/* CANVAS RENDER CONTAINER */}
-            <div className="relative w-full rounded-lg overflow-hidden border border-slate-800 bg-slate-900" style={{ height: 380 }}>
-              
-              {/* CAMERA ANGLE & ROTATE OVERLAY TOOLBAR */}
-              {viewStyle === '3d' && (
-                <div className="absolute top-2 left-2 z-10 row flex-wrap gap-1.5 p-1 bg-slate-950/80 backdrop-blur border border-slate-800 rounded-lg text-xs font-mono">
-                  <button
-                    className={`btn tiny px-2 py-1 ${autoRotate ? 'bg-cyan-600 text-white font-bold' : 'bg-slate-900 text-slate-300'}`}
-                    onClick={() => setAutoRotate(!autoRotate)}
-                  >
-                    🔄 360° {autoRotate ? 'ROTATE ON' : 'ROTATE'}
-                  </button>
-                  <button
-                    className={`btn tiny px-2 py-1 ${cameraPreset === 'default' ? 'bg-blue-600 text-white font-bold' : 'bg-slate-900 text-slate-300'}`}
-                    onClick={() => setCameraPreset('default')}
-                  >
-                    🎲 DEFAULT
-                  </button>
-                  <button
-                    className={`btn tiny px-2 py-1 ${cameraPreset === 'top' ? 'bg-blue-600 text-white font-bold' : 'bg-slate-900 text-slate-300'}`}
-                    onClick={() => setCameraPreset('top')}
-                  >
-                    🔝 TOP
-                  </button>
-                  <button
-                    className={`btn tiny px-2 py-1 ${cameraPreset === 'front' ? 'bg-blue-600 text-white font-bold' : 'bg-slate-900 text-slate-300'}`}
-                    onClick={() => setCameraPreset('front')}
-                  >
-                    👁️ FRONT
-                  </button>
-                  <button
-                    className={`btn tiny px-2 py-1 ${cameraPreset === 'side' ? 'bg-blue-600 text-white font-bold' : 'bg-slate-900 text-slate-300'}`}
-                    onClick={() => setCameraPreset('side')}
-                  >
-                    ↔️ SIDE
-                  </button>
-                  <button
-                    className={`btn tiny px-2 py-1 ${cameraPreset === 'esp32' ? 'bg-emerald-600 text-white font-bold' : 'bg-slate-900 text-slate-300'}`}
-                    onClick={() => { setCameraPreset('esp32'); setActiveModule('esp32c3'); }}
-                  >
-                    🔍 ESP32 FOCUS
-                  </button>
-                  <button
-                    className={`btn tiny px-2 py-1 ${showCallouts ? 'bg-purple-900 text-purple-200 border-purple-500' : 'bg-slate-900 text-slate-400'}`}
-                    onClick={() => setShowCallouts(!showCallouts)}
-                  >
-                    🏷️ CALLOUTS
-                  </button>
-                </div>
-              )}
-
-              {/* VIEW 1: FULL 3D INTERACTIVE BREADBOARD MODEL */}
-              {viewStyle === '3d' && (
-                <BreadboardScene
-                  activeModule={activeModule}
-                  setActiveModule={setActiveModule}
-                  loadForceN={loadForceN}
-                  tempC={tempC}
-                  vibrationActive={vibrationActive}
-                  buzzerBeeping={buzzerBeeping}
-                  isConnected={isConnected}
-                  cameraPreset={cameraPreset}
-                  autoRotate={autoRotate}
-                  showCallouts={showCallouts}
-                />
-              )}
-
-              {/* VIEW 2: 2D OFFICIAL SCHEMATIC WIRING DIAGRAM */}
-              {viewStyle === 'schematic' && (
-                <div className="relative w-full h-full overflow-hidden">
-                  <img
-                    src="/hardware_wiring_diagram.jpg"
-                    alt="SHIELD Hardware Layout"
-                    className="w-full h-full object-contain block"
-                  />
-                </div>
-              )}
-
-            </div>
-
-            {/* LIVE WORKING INTERACTIVE HARDWARE CONTROLS */}
-            <div className="panel p-3 bg-slate-900/90 border border-slate-800 rounded-lg grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-mono">
-              
-              {/* CONTROL 1: SIMULATED LOAD CELL FORCE */}
-              <div className="col gap-1.5 p-2 bg-slate-950 rounded border border-slate-800">
-                <div className="spread">
-                  <span className="tiny faint">LOAD CELL STRAIN:</span>
-                  <span className={`font-bold ${loadForceN > 1200 ? 'text-red-400 animate-pulse' : loadForceN > 500 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                    {loadForceN.toFixed(0)} N
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="2000"
-                  step="25"
-                  value={loadForceN}
-                  onChange={(e) => setLoadForceN(parseFloat(e.target.value))}
-                  className="w-full accent-cyan-400 cursor-pointer"
-                />
-                <div className="spread tiny text-[10px] text-slate-500">
-                  <span>0 N (Normal)</span>
-                  <span>500 N (Caution)</span>
-                  <span>1200 N (Yield)</span>
-                </div>
-              </div>
-
-              {/* CONTROL 2: ACTUATOR TEST BUTTONS */}
-              <div className="col gap-1.5 p-2 bg-slate-950 rounded border border-slate-800">
-                <span className="tiny faint">ACTUATOR TEST BUTTONS:</span>
-                <div className="row gap-1.5">
-                  <button
-                    className="btn tiny flex-1"
-                    onClick={() => triggerBuzzerAudio(880, 250)}
-                    style={{ background: buzzerBeeping ? '#7e22ce' : 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid #a855f7' }}
-                  >
-                    🔔 TEST BUZZER
-                  </button>
-                  <button
-                    className="btn tiny flex-1"
-                    onClick={triggerVibrationMotor}
-                    style={{ background: vibrationActive ? '#d97706' : 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid #f59e0b' }}
-                  >
-                    ⚡ VIBRATE MOTOR
-                  </button>
-                </div>
-              </div>
-
-              {/* CONTROL 3: SENSORS INPUT (TEMP & GYRO) */}
-              <div className="col gap-1.5 p-2 bg-slate-950 rounded border border-slate-800">
-                <div className="spread">
-                  <span className="tiny faint">DS18B20 TEMP:</span>
-                  <span className="font-bold text-cyan-300">{tempC.toFixed(1)} °C</span>
-                </div>
-                <input
-                  type="range"
-                  min="-20"
-                  max="100"
-                  step="1"
-                  value={tempC}
-                  onChange={(e) => setTempC(parseFloat(e.target.value))}
-                  className="w-full accent-amber-400 cursor-pointer"
-                />
-                <div className="spread tiny text-[10px] text-slate-400">
-                  <span>MPU6050 Pitch: {pitchDeg}°</span>
-                  <span>Roll: {rollDeg}°</span>
-                </div>
-              </div>
-
-            </div>
-
-          </div>
-        </div>
-
-        {/* RIGHT 4 COLUMNS: PIN CONNECTION SUMMARY PANEL */}
-        <div className="lg:col-span-4 flex flex-col gap-3">
-          <div className="panel p-4 bg-slate-950/95 border border-slate-800 rounded-xl col gap-3 shadow-2xl" style={{ minHeight: 440 }}>
-            
-            <div className="spread pb-2 border-b border-slate-800">
-              <span className="font-bold text-xs uppercase tracking-wider text-slate-200">PIN CONNECTION SUMMARY</span>
-              <span className="tiny mono text-cyan-400 font-bold">ESP32-C3 GPIO NETLIST</span>
-            </div>
-
-            {/* COLOR-CODED PIN CONNECTION CATEGORIES */}
-            <div className="col gap-2.5 text-xs font-mono">
-              
-              {/* CATEGORY 1: POWER DISTRIBUTION */}
               <div
-                onClick={() => setActiveModule('power')}
-                className={`panel p-2.5 rounded-lg border col gap-1.5 cursor-pointer transition-all ${
-                  activeModule === 'power' ? 'bg-red-950/40 border-red-500' : 'bg-slate-900/80 border-slate-800 hover:border-slate-700'
+                className={`flex justify-between text-[10px] ${textMuted} pt-1 border-t ${
+                  isDark ? 'border-slate-800' : 'border-slate-200'
                 }`}
               >
-                <div className="row gap-2 font-bold text-red-400 text-xs">
-                  <span>⚡</span>
-                  <span>Power Distribution</span>
-                </div>
-                <div className="col gap-1 text-[11px] text-slate-300 pl-4">
-                  <div className="spread"><span>ESP32 3.3V</span><span className="text-slate-500">→</span><span>Breadboard + Rail</span></div>
-                  <div className="spread"><span>ESP32 5V/VIN</span><span className="text-slate-500">→</span><span>L298N 12V/VCC</span></div>
-                  <div className="spread"><span>ESP32 GND</span><span className="text-slate-500">→</span><span>Breadboard - Rail (Common GND)</span></div>
-                </div>
+                <span>DO PIN (GPIO 2):</span>
+                <span className={isDark ? 'text-amber-300 font-bold' : 'text-amber-600 font-bold'}>
+                  {telemetry.vibrationSensorDetected ? 'HIGH (3.3V)' : 'LOW (0V)'}
+                </span>
               </div>
-
-              {/* CATEGORY 2: SENSORS */}
-              <div
-                onClick={() => setActiveModule('sensors')}
-                className={`panel p-2.5 rounded-lg border col gap-1.5 cursor-pointer transition-all ${
-                  activeModule === 'sensors' || activeModule === 'mpu6050' || activeModule === 'ds18b20' || activeModule === 'hx711' ? 'bg-sky-950/40 border-sky-500' : 'bg-slate-900/80 border-slate-800 hover:border-slate-700'
-                }`}
-              >
-                <div className="row gap-2 font-bold text-sky-400 text-xs">
-                  <span>🛰️</span>
-                  <span>Sensors</span>
-                </div>
-                <div className="col gap-1.5 text-[11px] text-slate-300 pl-4">
-                  <div>
-                    <div className="font-bold text-cyan-300">HX711 ADC:</div>
-                    <div className="spread tiny text-slate-400"><span>VCC → 3.3V</span><span>GND → GND</span><span>DT → GPIO 6</span><span>SCK → GPIO 7</span></div>
-                  </div>
-                  <div>
-                    <div className="font-bold text-sky-300">MPU6050 IMU:</div>
-                    <div className="spread tiny text-slate-400"><span>VCC → 3.3V</span><span>GND → GND</span><span>SDA → GPIO 8</span><span>SCL → GPIO 9</span></div>
-                  </div>
-                  <div>
-                    <div className="font-bold text-amber-300">DS18B20 Temp:</div>
-                    <div className="tiny text-slate-400">VCC → 3.3V | GND → GND | DATA → GPIO 5 (with 4.7kΩ pull-up)</div>
-                  </div>
-                </div>
+              <div className={`flex justify-between text-[10px] ${textMuted}`}>
+                <span>MECHANISM:</span>
+                <span className={isDark ? 'text-cyan-300' : 'text-cyan-700'}>Normally Closed Spring</span>
               </div>
-
-              {/* CATEGORY 3: LOAD CELLS TO HX711 */}
-              <div
-                onClick={() => setActiveModule('loadcell')}
-                className={`panel p-2.5 rounded-lg border col gap-1.5 cursor-pointer transition-all ${
-                  activeModule === 'loadcell' ? 'bg-emerald-950/40 border-emerald-500' : 'bg-slate-900/80 border-slate-800 hover:border-slate-700'
-                }`}
-              >
-                <div className="row gap-2 font-bold text-emerald-400 text-xs">
-                  <span>🔒</span>
-                  <span>Load Cells to HX711</span>
-                </div>
-                <div className="col gap-1 text-[11px] text-slate-300 pl-4">
-                  <div className="spread"><span>LC1 Red → E+</span><span>LC2 Red → E-</span></div>
-                  <div className="spread"><span>Two Black (twisted)</span><span className="text-slate-500">→</span><span>A+</span></div>
-                  <div className="spread"><span>Two White (twisted)</span><span className="text-slate-500">→</span><span>A-</span></div>
-                </div>
-              </div>
-
-              {/* CATEGORY 4: ACTUATORS & INDICATORS */}
-              <div
-                onClick={() => setActiveModule('actuators')}
-                className={`panel p-2.5 rounded-lg border col gap-1.5 cursor-pointer transition-all ${
-                  activeModule === 'actuators' || activeModule === 'l298n' || activeModule === 'buzzer' || activeModule === 'traffic_leds' ? 'bg-amber-950/40 border-amber-500' : 'bg-slate-900/80 border-slate-800 hover:border-slate-700'
-                }`}
-              >
-                <div className="row gap-2 font-bold text-amber-400 text-xs">
-                  <span>⚙️</span>
-                  <span>Actuators & Indicators</span>
-                </div>
-                <div className="col gap-1.5 text-[11px] text-slate-300 pl-4">
-                  <div>
-                    <div className="font-bold text-red-400">L298N Driver:</div>
-                    <div className="tiny text-slate-400">IN3 → GPIO 4 | IN4 → GND | ENB → Black cap (enable)</div>
-                  </div>
-                  <div>
-                    <div className="font-bold text-amber-300">Coin Motor:</div>
-                    <div className="tiny text-slate-400">Red → OUT3 | Blue/Black → OUT4</div>
-                  </div>
-                  <div>
-                    <div className="font-bold text-purple-300">Buzzer (GPIO 3):</div>
-                    <div className="tiny text-slate-400">(+) Long pin → GPIO 3 | (-) Short pin → GND</div>
-                  </div>
-                  <div>
-                    <div className="font-bold text-emerald-300">Traffic LEDs:</div>
-                    <div className="tiny text-slate-400">Green → GPIO 0 | Yellow → GPIO 1 | Red → GPIO 10 (all 220Ω)</div>
-                  </div>
-                </div>
-              </div>
-
             </div>
           </div>
-        </div>
+        );
 
-      </div>
-
-      {/* ============================================================
-          BOTTOM HARDWARE SERIAL TERMINAL CONSOLE (LIVE HARDWARE WORK GATEWAY)
-          ============================================================ */}
-      <div className="panel p-3 bg-slate-950/95 border border-cyan-500/50 rounded-xl col gap-3 shadow-2xl">
-        
-        {/* TERMINAL HEADER & SERIAL PORT GATEWAY CONTROLS */}
-        <div className="spread flex-wrap gap-2 pb-2 border-b border-slate-800 text-xs font-mono">
-          <div className="row gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="font-bold text-cyan-300 uppercase tracking-wider">HARDWARE SERIAL TERMINAL & GATEWAY CLI</span>
-            <span className="tiny faint text-slate-400">| Direct Hardware Communications Link</span>
+      case 'mpu6050':
+        return (
+          <div className="space-y-2">
+            <div className={`grid grid-cols-2 gap-1.5 p-2 rounded-lg border text-[11px] font-mono ${cardBg}`}>
+              <div className={`p-1.5 rounded border ${subCardBg}`}>
+                <span className={`${textMuted} block text-[9px]`}>ROLL (ΔR)</span>
+                <span className={`${isDark ? 'text-cyan-300' : 'text-cyan-700'} font-bold text-sm tabular-nums`}>
+                  {telemetry.roll}°
+                </span>
+              </div>
+              <div className={`p-1.5 rounded border ${subCardBg}`}>
+                <span className={`${textMuted} block text-[9px]`}>PITCH (ΔP)</span>
+                <span className={`${isDark ? 'text-cyan-300' : 'text-cyan-700'} font-bold text-sm tabular-nums`}>
+                  {telemetry.pitch}°
+                </span>
+              </div>
+              <div className={`p-1.5 rounded border ${subCardBg}`}>
+                <span className={`${textMuted} block text-[9px]`}>G-FORCE</span>
+                <span className={`${textHeading} font-bold text-xs tabular-nums`}>{telemetry.accel.z} G</span>
+              </div>
+              <div className={`p-1.5 rounded border ${subCardBg}`}>
+                <span className={`${textMuted} block text-[9px]`}>GYRO RATE</span>
+                <span className={`${textHeading} font-bold text-xs tabular-nums`}>{telemetry.gyro.z} °/s</span>
+              </div>
+            </div>
           </div>
+        );
 
-          <div className="row gap-2">
-            {/* COM Port Selector */}
-            <select
-              value={comPort}
-              onChange={(e) => setComPort(e.target.value)}
-              className="text-xs px-2 py-1 bg-slate-900 border border-slate-700 rounded text-cyan-300 font-mono font-bold cursor-pointer"
-            >
-              <option value="COM3">COM3 — ESP32-C3 Gateway</option>
-              <option value="COM4">COM4 — Hardware Test Rig</option>
-              <option value="COM5">COM5 — External Sensor Hub</option>
-            </select>
+      case 'hx711':
+      case 'load-cell-1':
+      case 'load-cell-2':
+      case 'load-cell-3':
+      case 'load-cell-4':
+      case 'load-cell-combiner':
+        return (
+          <div className="space-y-2">
+            <div className={`grid grid-cols-2 gap-1.5 p-2 rounded-lg border text-[11px] font-mono ${cardBg}`}>
+              <div className={`p-1.5 rounded border ${subCardBg}`}>
+                <span className={`${textMuted} block text-[9px]`}>LOAD WEIGHT</span>
+                <span className={`${textHeading} font-bold text-sm tabular-nums`}>{telemetry.loadKg} kg</span>
+              </div>
+              <div className={`p-1.5 rounded border ${subCardBg}`}>
+                <span className={`${textMuted} block text-[9px]`}>MICROSTRAIN</span>
+                <span
+                  className={`font-bold text-sm tabular-nums ${
+                    telemetry.strainMicroStrain > 500 ? 'text-rose-500' : isDark ? 'text-cyan-300' : 'text-cyan-700'
+                  }`}
+                >
+                  {telemetry.strainMicroStrain} με
+                </span>
+              </div>
+              <div className={`p-1.5 rounded border ${subCardBg}`}>
+                <span className={`${textMuted} block text-[9px]`}>DEFLECTION</span>
+                <span className={`${textHeading} font-bold text-xs tabular-nums`}>
+                  {telemetry.strainDeformationMm} mm
+                </span>
+              </div>
+              <div className={`p-1.5 rounded border ${subCardBg}`}>
+                <span className={`${textMuted} block text-[9px]`}>RAW ADC</span>
+                <span className={`${isDark ? 'text-cyan-400' : 'text-cyan-700'} font-bold text-xs tabular-nums`}>
+                  {telemetry.loadCell1Raw.toLocaleString()}
+                </span>
+              </div>
+            </div>
 
-            {/* Baud Rate Selector */}
-            <select
-              value={baudRate}
-              onChange={(e) => setBaudRate(parseInt(e.target.value, 10))}
-              className="text-xs px-2 py-1 bg-slate-900 border border-slate-700 rounded text-slate-300 font-mono font-bold cursor-pointer"
-            >
-              <option value={115200}>115200 Baud</option>
-              <option value={9600}>9600 Baud</option>
-              <option value={57600}>57600 Baud</option>
-            </select>
-
-            {/* Connect / Disconnect Toggle Button */}
+            {/* Hardware Remote Control Button: Tare / Zero */}
             <button
-              className="btn tiny"
-              onClick={() => setIsConnected(!isConnected)}
-              style={{
-                background: isConnected ? '#059669' : '#dc2626',
-                color: '#fff',
-                fontWeight: 800,
-                border: 'none',
-                padding: '4px 12px',
-                cursor: 'pointer',
-              }}
-            >
-              {isConnected ? '🔌 CONNECTED (COM3)' : '⏸ DISCONNECTED'}
-            </button>
-
-            <button
-              className="btn tiny"
-              onClick={() => setTerminalLogs([])}
-              style={{ background: 'rgba(255,255,255,0.06)', color: '#94a3b8' }}
-            >
-              Clear Log
-            </button>
-          </div>
-        </div>
-
-        {/* TERMINAL LOG OUTPUT CONSOLE */}
-        <div
-          ref={terminalBoxRef}
-          className="p-3 bg-slate-900/90 rounded-lg border border-slate-800 font-mono text-xs text-emerald-400 col gap-1 overflow-y-auto"
-          style={{ height: 160, filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.5))' }}
-        >
-          {terminalLogs.map((log, i) => (
-            <div
-              key={i}
-              className={`leading-relaxed ${
-                log.includes('CRITICAL') || log.includes('ERR') ? 'text-red-400 font-bold' :
-                log.includes('CAUTION') || log.includes('TX') ? 'text-amber-300' :
-                log.includes('SYSTEM') ? 'text-cyan-300 font-bold' : 'text-emerald-400'
+              onClick={() => handleHardwareControl('CMD:TARE')}
+              className={`w-full py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-xs border ${
+                isDark
+                  ? 'text-amber-300 bg-amber-950/80 hover:bg-amber-900 border-amber-500/60'
+                  : 'text-amber-900 bg-amber-100 hover:bg-amber-200 border-amber-300'
               }`}
             >
-              {log}
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Tare Load Cells (Zero Scale)</span>
+            </button>
+          </div>
+        );
+
+      case 'ds18b20':
+        return (
+          <div className={`p-2 rounded-lg border text-[11px] font-mono space-y-1 ${cardBg}`}>
+            <div className="flex justify-between items-center">
+              <span className={`${textMuted} text-[10px]`}>CHASSIS TEMP:</span>
+              <span className={`text-lg font-bold tabular-nums ${isDark ? 'text-cyan-300' : 'text-cyan-700'}`}>
+                {telemetry.temperatureC} °C
+              </span>
             </div>
-          ))}
-        </div>
+            <div
+              className={`flex justify-between text-[10px] ${textMuted} pt-1 border-t ${
+                isDark ? 'border-slate-800' : 'border-slate-200'
+              }`}
+            >
+              <span>Bus: 1-Wire (GPIO 5)</span>
+              <span className={isDark ? 'text-emerald-400' : 'text-emerald-700'}>4.7kΩ Pullup OK</span>
+            </div>
+          </div>
+        );
 
-        {/* SERIAL COMMAND INPUT LINE (CLI) */}
-        <div className="row gap-2 font-mono text-xs">
-          <span className="text-cyan-400 font-bold text-sm">&gt;</span>
-          <input
-            type="text"
-            placeholder="Enter Serial Command (e.g. TARE, BUZZER, VIBRATE, FORCE=750)..."
-            value={commandInput}
-            onChange={(e) => setCommandInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') handleSendCommand();
-            }}
-            className="flex-1 px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-white font-mono outline-none focus:border-cyan-500"
+      case 'traffic-leds':
+        return (
+          <div className="space-y-2">
+            <div className={`grid grid-cols-3 gap-1.5 p-2 rounded-lg border text-[10px] font-mono text-center ${cardBg}`}>
+              <button
+                onClick={() => handleHardwareControl(telemetry.ledGreen ? 'CMD:LED_GREEN:0' : 'CMD:LED_GREEN:1')}
+                className={`p-1.5 rounded border transition-colors cursor-pointer ${
+                  telemetry.ledGreen
+                    ? isDark
+                      ? 'bg-emerald-950/90 border-emerald-500 text-emerald-300 font-bold shadow-sm'
+                      : 'bg-emerald-100 border-emerald-400 text-emerald-800 font-bold'
+                    : isDark
+                    ? 'bg-slate-900 border-slate-800 text-slate-500 hover:text-slate-300'
+                    : 'bg-white border-slate-200 text-slate-400 hover:text-slate-700'
+                }`}
+              >
+                GREEN
+                <br />
+                {telemetry.ledGreen ? '● ON (Click Off)' : '○ OFF'}
+              </button>
+              <button
+                onClick={() => handleHardwareControl(telemetry.ledYellow ? 'CMD:LED_YELLOW:0' : 'CMD:LED_YELLOW:1')}
+                className={`p-1.5 rounded border transition-colors cursor-pointer ${
+                  telemetry.ledYellow
+                    ? isDark
+                      ? 'bg-amber-950/90 border-amber-500 text-amber-300 font-bold shadow-sm'
+                      : 'bg-amber-100 border-amber-400 text-amber-800 font-bold'
+                    : isDark
+                    ? 'bg-slate-900 border-slate-800 text-slate-500 hover:text-slate-300'
+                    : 'bg-white border-slate-200 text-slate-400 hover:text-slate-700'
+                }`}
+              >
+                YELLOW
+                <br />
+                {telemetry.ledYellow ? '● ON (Click Off)' : '○ OFF'}
+              </button>
+              <button
+                onClick={() => handleHardwareControl(telemetry.ledRed ? 'CMD:LED_RED:0' : 'CMD:LED_RED:1')}
+                className={`p-1.5 rounded border transition-colors cursor-pointer ${
+                  telemetry.ledRed
+                    ? isDark
+                      ? 'bg-rose-950/90 border-rose-500 text-rose-300 font-bold shadow-sm animate-pulse'
+                      : 'bg-rose-100 border-rose-400 text-rose-800 font-bold'
+                    : isDark
+                    ? 'bg-slate-900 border-slate-800 text-slate-500 hover:text-slate-300'
+                    : 'bg-white border-slate-200 text-slate-400 hover:text-slate-700'
+                }`}
+              >
+                RED
+                <br />
+                {telemetry.ledRed ? '● ON (Click Off)' : '○ OFF'}
+              </button>
+            </div>
+            <button
+              onClick={() => handleHardwareControl('CMD:LED_TEST:1')}
+              className={`w-full py-1.5 text-[11px] font-semibold rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1.5 border ${
+                isDark
+                  ? 'text-cyan-300 bg-cyan-950/80 hover:bg-cyan-900 border-cyan-500/50'
+                  : 'text-cyan-800 bg-cyan-100 hover:bg-cyan-200 border-cyan-300'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Run LED Sequence Test</span>
+            </button>
+          </div>
+        );
+
+      case 'coin-motor':
+      case 'l298n':
+        return (
+          <div className="space-y-2">
+            <div className={`p-2 rounded-lg border text-[11px] font-mono space-y-1 ${cardBg}`}>
+              <div className="flex justify-between items-center">
+                <span className={`${textMuted} text-[10px]`}>VIBRATION MOTOR:</span>
+                <span
+                  className={`font-bold ${
+                    telemetry.vibrationMotorActive
+                      ? isDark
+                        ? 'text-cyan-300 animate-pulse'
+                        : 'text-cyan-700 animate-pulse'
+                      : textMuted
+                  }`}
+                >
+                  {telemetry.vibrationMotorActive ? `PWM ${telemetry.vibrationDutyCycle}/255` : 'IDLE (OFF)'}
+                </span>
+              </div>
+              <div className={`text-[10px] ${textMuted}`}>GPIO 4 / L298N H-Bridge Drive</div>
+            </div>
+
+            {/* Hardware Motor Control Buttons */}
+            <div className="grid grid-cols-3 gap-1.5">
+              <button
+                onClick={() => handleHardwareControl('CMD:MOTOR:255')}
+                className={`py-1.5 px-2 text-[10px] font-bold rounded-lg border transition-colors cursor-pointer ${
+                  isDark
+                    ? 'text-emerald-300 bg-emerald-950/80 hover:bg-emerald-900 border-emerald-500/60'
+                    : 'text-emerald-800 bg-emerald-100 hover:bg-emerald-200 border-emerald-300'
+                }`}
+              >
+                100% ON
+              </button>
+              <button
+                onClick={() => handleHardwareControl('CMD:MOTOR:128')}
+                className={`py-1.5 px-2 text-[10px] font-bold rounded-lg border transition-colors cursor-pointer ${
+                  isDark
+                    ? 'text-amber-300 bg-amber-950/80 hover:bg-amber-900 border-amber-500/60'
+                    : 'text-amber-800 bg-amber-100 hover:bg-amber-200 border-amber-300'
+                }`}
+              >
+                50% PWM
+              </button>
+              <button
+                onClick={() => handleHardwareControl('CMD:MOTOR:0')}
+                className={`py-1.5 px-2 text-[10px] font-bold rounded-lg border transition-colors cursor-pointer ${
+                  isDark
+                    ? 'text-rose-300 bg-rose-950/80 hover:bg-rose-900 border-rose-500/60'
+                    : 'text-rose-800 bg-rose-100 hover:bg-rose-200 border-rose-300'
+                }`}
+              >
+                STOP
+              </button>
+            </div>
+          </div>
+        );
+
+      case 'buzzer':
+        return (
+          <div className="space-y-2">
+            <div className={`p-2 rounded-lg border text-[11px] font-mono space-y-1 ${cardBg}`}>
+              <div className="flex justify-between items-center">
+                <span className={`${textMuted} text-[10px]`}>ACOUSTIC BUZZER:</span>
+                <span className={`font-bold ${telemetry.buzzerActive ? 'text-amber-500 animate-pulse' : textMuted}`}>
+                  {telemetry.buzzerActive ? `SOUNDING (${telemetry.buzzerFrequency || 2800} Hz)` : 'SILENT (OFF)'}
+                </span>
+              </div>
+              <div className={`text-[10px] ${textMuted}`}>Pin: GPIO 3 (Active Piezo)</div>
+            </div>
+
+            {/* Hardware Buzzer Control Buttons */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => handleHardwareControl('CMD:BUZZER:1')}
+                className={`py-1.5 px-2 text-xs font-bold rounded-lg border transition-colors cursor-pointer flex items-center justify-center gap-1.5 ${
+                  telemetry.buzzerActive
+                    ? 'bg-amber-600 text-white border-amber-400'
+                    : isDark
+                    ? 'bg-amber-950/80 border-amber-500/60 text-amber-300 hover:bg-amber-900'
+                    : 'bg-amber-100 border-amber-300 text-amber-800 hover:bg-amber-200'
+                }`}
+              >
+                <Bell className="w-3.5 h-3.5" />
+                <span>Buzzer (ON)</span>
+              </button>
+              <button
+                onClick={() => handleHardwareControl('CMD:BUZZER:0')}
+                className={`py-1.5 px-2 text-xs font-bold rounded-lg border transition-colors cursor-pointer flex items-center justify-center gap-1.5 ${
+                  isDark
+                    ? 'text-slate-300 bg-slate-800 hover:bg-slate-700 border-slate-600'
+                    : 'text-slate-700 bg-white hover:bg-slate-100 border-slate-300'
+                }`}
+              >
+                <span>Silence (OFF)</span>
+              </button>
+            </div>
+          </div>
+        );
+
+      case 'esp32-c3':
+      default:
+        return (
+          <div className="space-y-2">
+            <div className={`grid grid-cols-2 gap-1.5 p-2 rounded-lg border text-[11px] font-mono ${cardBg}`}>
+              <div className={`p-1.5 rounded border ${subCardBg}`}>
+                <span className={`${textMuted} block text-[9px]`}>SYSTEM HEALTH</span>
+                <span
+                  className={`font-bold text-xs ${
+                    telemetry.systemStatus === 'CRITICAL'
+                      ? 'text-rose-500'
+                      : telemetry.systemStatus === 'WARNING'
+                      ? 'text-amber-500'
+                      : 'text-emerald-500'
+                  }`}
+                >
+                  {telemetry.systemStatus}
+                </span>
+              </div>
+              <div className={`p-1.5 rounded border ${subCardBg}`}>
+                <span className={`${textMuted} block text-[9px]`}>DATA STREAM</span>
+                <span className={`${isDark ? 'text-cyan-300' : 'text-cyan-700'} font-bold text-xs`}>
+                  {telemetry.dataSource === 'REAL_HARDWARE' ? 'COM5 LIVE' : 'SIMULATOR'}
+                </span>
+              </div>
+              <div className={`p-1.5 rounded border ${subCardBg}`}>
+                <span className={`${textMuted} block text-[9px]`}>STRAIN / LOAD</span>
+                <span className={`${textHeading} font-bold text-xs`}>
+                  {telemetry.strainMicroStrain}με · {telemetry.loadKg}kg
+                </span>
+              </div>
+              <div className={`p-1.5 rounded border ${subCardBg}`}>
+                <span className={`${textMuted} block text-[9px]`}>ORIENTATION</span>
+                <span className={`${textHeading} font-bold text-xs`}>
+                  R:{telemetry.roll}° P:{telemetry.pitch}°
+                </span>
+              </div>
+            </div>
+
+            {/* Hardware System Alarm Test Controls */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => handleHardwareControl('CMD:ALARM_TEST:1')}
+                className={`py-1.5 px-2 text-[11px] font-bold rounded-lg border transition-colors cursor-pointer flex items-center justify-center gap-1.5 ${
+                  isDark
+                    ? 'text-rose-300 bg-rose-950/80 hover:bg-rose-900 border-rose-500/60'
+                    : 'text-rose-800 bg-rose-100 hover:bg-rose-200 border-rose-300'
+                }`}
+              >
+                <AlertTriangle className="w-3.5 h-3.5" />
+                <span>Alarm Test</span>
+              </button>
+              <button
+                onClick={() => handleHardwareControl('CMD:ALARM_TEST:0')}
+                className={`py-1.5 px-2 text-[11px] font-bold rounded-lg border transition-colors cursor-pointer flex items-center justify-center gap-1.5 ${
+                  isDark
+                    ? 'text-emerald-300 bg-emerald-950/80 hover:bg-emerald-900 border-emerald-500/60'
+                    : 'text-emerald-800 bg-emerald-100 hover:bg-emerald-200 border-emerald-300'
+                }`}
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>Clear Alarm</span>
+              </button>
+            </div>
+          </div>
+        );
+    }
+  };
+
+  return (
+    <div
+      className={`flex flex-col w-full h-full min-h-[calc(100vh-50px)] overflow-hidden select-none font-['Plus_Jakarta_Sans',var(--font-sans)] transition-colors duration-200 ${
+        isDark ? 'bg-[#0a0e13] text-[#E6EDF5]' : 'bg-[#f8fafc] text-slate-900'
+      }`}
+    >
+      {/* Top Header Bar with Navigation Tabs (Live Data | Hardware Control | 3D Bench) */}
+      <Header
+        viewMode={viewMode}
+        systemStatus={telemetry.systemStatus}
+        dataSource={telemetry.dataSource}
+        currentPage={currentPage}
+        onSelectPage={(p) => setCurrentPage(p)}
+        isSidebarOpen={isSidebarOpen}
+        onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
+        isControlSlideBarOpen={isControlSlideBarOpen}
+        onToggleControlSlideBar={() => setIsControlSlideBarOpen((prev) => !prev)}
+        isFullScreen={isFullScreen}
+        onToggleFullScreen={handleToggleFullScreen}
+        onOpenValidator={() => setActiveModal('VALIDATOR')}
+        onOpenLoadCellConfig={() => setActiveModal('LOAD_CELL_CONFIG')}
+        onOpenRealHardware={() => setActiveModal('REAL_HARDWARE')}
+      />
+
+      {/* Page Routing: Live Data | Hardware Control & Testing | 3D Bench */}
+      {currentPage === 'LIVE_DATA' ? (
+        <LiveHardwareDataPage
+          telemetry={telemetry}
+          hardwareParams={hardwareParams}
+          onNavigateToControl={() => setCurrentPage('HARDWARE_CONTROL')}
+          onHardwareControl={handleHardwareControl}
+          onOpenRealHardwareModal={() => setActiveModal('REAL_HARDWARE')}
+          logs={rawLogs}
+        />
+      ) : currentPage === 'HARDWARE_CONTROL' ? (
+        <HardwareControlBenchPage
+          telemetry={telemetry}
+          hardwareParams={hardwareParams}
+          onSetBaseWeight={handleSetBaseWeight}
+          onSetTemperature={handleSetTemperature}
+          onSetThresholds={handleSetThresholds}
+          onResetParameters={handleResetParameters}
+          onSetSimulatedPressure={handleSetSimulatedPressure}
+          onHardwareControl={handleHardwareControl}
+          onNavigateToLiveData={() => setCurrentPage('LIVE_DATA')}
+        />
+      ) : (
+        <>
+          {/* Main Center Area: 3D Viewport + Right Telemetry Sidebar */}
+          <div className="flex flex-1 min-h-0 overflow-hidden relative">
+            {/* Left/Center: 3D Scene Viewport */}
+            <div className="flex-1 h-full min-h-[500px] relative">
+              <HardwareBenchScene3D
+                telemetry={telemetry}
+                viewMode={viewMode}
+                wires={wires}
+                components={components}
+                selectedComponent={selectedComponent}
+                selectedWire={selectedWire}
+                onSelectComponent={(comp) => {
+                  setSelectedComponent(comp);
+                }}
+                onSelectWire={(w) => setSelectedWire(w)}
+                lockedComponents={lockedComponents}
+                routingMode={routingMode}
+                onToggleRoutingMode={(mode) => setRoutingMode(mode)}
+                onAlignWiring={() => setRoutingMode('ALIGNED_ORTHOGONAL')}
+                onOpenLockManager={() => setActiveModal('VALIDATOR')}
+                isTracingConnections={isTracingConnections}
+                isSlideBarOpen={isControlSlideBarOpen}
+                onToggleSlideBar={() => setIsControlSlideBarOpen((prev) => !prev)}
+                isFullScreen={isFullScreen}
+                onToggleFullScreen={handleToggleFullScreen}
+              />
+
+              {/* Full Screen Mode Floating Toggle Button */}
+              <button
+                onClick={handleToggleFullScreen}
+                title={isFullScreen ? 'Exit Full Screen 3D Mode' : 'Expand 3D Scene to Full Screen'}
+                className={`absolute top-4 ${isSidebarOpen ? 'right-40' : 'right-44'} z-30 h-8 px-3 backdrop-blur-md rounded-md border shadow-md text-xs font-mono transition-all cursor-pointer flex items-center gap-1.5 select-none pointer-events-auto shrink-0 whitespace-nowrap ${
+                  isDark
+                    ? 'bg-slate-900/90 border-slate-700/80 text-slate-300 hover:text-white hover:bg-slate-800'
+                    : 'bg-white/95 border-slate-300 text-slate-700 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                {isFullScreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+                <span>{isFullScreen ? 'Exit Fullscreen' : 'Fullscreen'}</span>
+              </button>
+
+              {/* Toggle Sidebar Floating Button */}
+              <button
+                onClick={() => setIsSidebarOpen((prev) => !prev)}
+                title={isSidebarOpen ? 'Hide Right Telemetry Dashboard (Full 3D View)' : 'Show Right Telemetry Dashboard'}
+                className={`absolute top-4 right-4 z-30 h-8 px-3 backdrop-blur-md rounded-md border shadow-md text-xs font-mono font-medium transition-all cursor-pointer flex items-center gap-1.5 select-none pointer-events-auto shrink-0 whitespace-nowrap ${
+                  isSidebarOpen
+                    ? isDark
+                      ? 'bg-slate-900/90 border-slate-700/80 text-slate-300 hover:text-white hover:bg-slate-800'
+                      : 'bg-white/95 border-slate-300 text-slate-700 hover:text-slate-900 hover:bg-slate-100'
+                    : isDark
+                    ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300 hover:bg-cyan-500/30 shadow-[0_0_10px_rgba(34,211,238,0.3)]'
+                    : 'bg-cyan-600 text-white border-cyan-700 hover:bg-cyan-700 shadow-md'
+                }`}
+              >
+                {isSidebarOpen ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
+                <span>{isSidebarOpen ? 'Hide Dashboard' : 'Show Dashboard'}</span>
+              </button>
+
+              {/* Floating Hardware Actuator Remote Control Quick-Dock (Bottom-Left) */}
+              <div
+                className={`absolute bottom-5 z-20 flex items-center gap-2 p-1.5 backdrop-blur-md rounded-lg shadow-xl font-mono text-xs transition-all duration-300 ease-in-out border ${
+                  isDark
+                    ? 'bg-slate-900/95 border-slate-800 text-slate-200 shadow-black/60'
+                    : 'bg-white/95 border-slate-300 text-slate-800 shadow-slate-300/60'
+                } ${isControlSlideBarOpen ? 'left-[21rem]' : 'left-4'}`}
+              >
+                <div className={`flex items-center gap-1.5 px-2 py-0.5 border-r ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                  <span className={`font-semibold text-[10px] tracking-wider uppercase ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
+                    Actuator Remote
+                  </span>
+                </div>
+
+                {/* Quick Buzzer Toggle */}
+                <button
+                  onClick={() => handleHardwareControl(telemetry.buzzerActive ? 'CMD:BUZZER:0' : 'CMD:BUZZER:1')}
+                  title="Toggle Hardware Piezo Buzzer"
+                  className={`h-7 px-2.5 rounded-md border text-[11px] font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
+                    telemetry.buzzerActive
+                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 font-semibold'
+                      : isDark
+                      ? 'bg-slate-800/80 hover:bg-slate-700/80 border-slate-700 text-slate-300'
+                      : 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-700'
+                  }`}
+                >
+                  <Bell className="w-3 h-3" />
+                  <span>Buzzer</span>
+                  <span className={`text-[10px] font-mono px-1 rounded ${telemetry.buzzerActive ? 'bg-amber-400 text-slate-950 font-bold' : 'text-slate-400'}`}>
+                    {telemetry.buzzerActive ? 'ON' : 'OFF'}
+                  </span>
+                </button>
+
+                {/* Quick Motor Toggle */}
+                <button
+                  onClick={() => handleHardwareControl(telemetry.vibrationMotorActive ? 'CMD:MOTOR:0' : 'CMD:MOTOR:255')}
+                  title="Toggle Hardware Vibration Motor"
+                  className={`h-7 px-2.5 rounded-md border text-[11px] font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
+                    telemetry.vibrationMotorActive
+                      ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50 font-semibold'
+                      : isDark
+                      ? 'bg-slate-800/80 hover:bg-slate-700/80 border-slate-700 text-slate-300'
+                      : 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-700'
+                  }`}
+                >
+                  <Zap className="w-3 h-3" />
+                  <span>Motor</span>
+                  <span className={`text-[10px] font-mono px-1 rounded ${telemetry.vibrationMotorActive ? 'bg-cyan-400 text-slate-950 font-bold' : 'text-slate-400'}`}>
+                    {telemetry.vibrationMotorActive ? 'ON' : 'OFF'}
+                  </span>
+                </button>
+
+                {/* Quick LED Test */}
+                <button
+                  onClick={() => handleHardwareControl('CMD:LED_TEST:1')}
+                  title="Flash test all hardware LEDs"
+                  className={`h-7 px-2.5 rounded-md border text-[11px] font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
+                    isDark
+                      ? 'border-emerald-500/40 bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300'
+                      : 'border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800'
+                  }`}
+                >
+                  <Sparkles className="w-3 h-3" />
+                  <span>Test LEDs</span>
+                </button>
+
+                {/* Quick Tare Load Cells */}
+                <button
+                  onClick={() => handleHardwareControl('CMD:TARE')}
+                  title="Zero out load cell tare offset"
+                  className={`h-7 px-2.5 rounded-md border text-[11px] font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
+                    isDark
+                      ? 'border-slate-700 bg-slate-800/60 hover:bg-slate-800 text-slate-300'
+                      : 'border-slate-300 bg-slate-100 hover:bg-slate-200 text-slate-700'
+                  }`}
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>Tare</span>
+                </button>
+              </div>
+
+              {/* Floating Selected Component Real-Time Values & Controls Card */}
+              {selectedComponent && (
+                <div
+                  className={`absolute bottom-5 right-5 z-20 w-80 p-3.5 backdrop-blur-md rounded-lg shadow-2xl animate-in fade-in slide-in-from-bottom-2 select-none border ${
+                    isDark
+                      ? 'bg-slate-900/95 border-slate-800 text-slate-200 shadow-black/80'
+                      : 'bg-white/95 border-slate-300 text-slate-700 shadow-slate-300/70'
+                  }`}
+                >
+                  <div
+                    className={`flex items-center justify-between gap-2 mb-2 pb-1.5 border-b ${
+                      isDark ? 'border-slate-800' : 'border-slate-200'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className={`px-1.5 py-0.5 text-[9px] font-mono rounded border ${
+                          isDark
+                            ? 'bg-slate-800 border-slate-700 text-cyan-300'
+                            : 'bg-cyan-50 border-cyan-200 text-cyan-700'
+                        }`}
+                      >
+                        {selectedComponent.category}
+                      </span>
+                      <h4
+                        className={`text-xs font-semibold font-mono truncate max-w-[160px] ${
+                          isDark ? 'text-white' : 'text-slate-900'
+                        }`}
+                      >
+                        {selectedComponent.name}
+                      </h4>
+                    </div>
+                    <button
+                      onClick={() => setSelectedComponent(null)}
+                      className={`p-1 rounded cursor-pointer ${
+                        isDark ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
+                      }`}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  <div className={`space-y-2 text-xs ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                    {/* Live Real-Time Sensor Telemetry Values for this Component */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className={`text-[9px] font-mono uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                          Live Values
+                        </span>
+                        <span
+                          className={`flex items-center gap-1 text-[9px] font-mono ${
+                            isDark ? 'text-emerald-400' : 'text-emerald-600 font-semibold'
+                          }`}
+                        >
+                          <span className={`w-1 h-1 rounded-full animate-pulse ${isDark ? 'bg-emerald-400' : 'bg-emerald-600'}`} />
+                          SYNC
+                        </span>
+                      </div>
+                      {renderLiveTelemetryForComponent(selectedComponent)}
+                    </div>
+
+                    <div className="flex items-center gap-1.5 pt-1">
+                      <button
+                        onClick={() => setActiveModal('INSPECTOR')}
+                        className={`h-8 flex-1 flex items-center justify-center gap-1 px-2.5 text-[10px] font-mono font-medium rounded-md border transition-colors cursor-pointer ${
+                          isDark
+                            ? 'text-cyan-300 bg-cyan-950/60 hover:bg-cyan-900/80 border-cyan-500/40'
+                            : 'text-cyan-800 bg-cyan-50 hover:bg-cyan-100 border-cyan-300'
+                        }`}
+                      >
+                        <FileText className="w-3 h-3" />
+                        <span>Inspect Pinout</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleToggleLock(selectedComponent.id)}
+                        title={
+                          lockedComponents[selectedComponent.id]
+                            ? 'Unlock Axis to Drag & Reposition'
+                            : 'Lock Axis in Place'
+                        }
+                        className={`h-8 px-2.5 text-[10px] font-mono font-medium rounded-md border transition-colors cursor-pointer flex items-center gap-1 ${
+                          lockedComponents[selectedComponent.id]
+                            ? isDark
+                              ? 'bg-emerald-950/60 border-emerald-500/60 text-emerald-300'
+                              : 'bg-emerald-100 border-emerald-400 text-emerald-800'
+                            : isDark
+                            ? 'bg-amber-950/60 border-amber-500/60 text-amber-300'
+                            : 'bg-amber-100 border-amber-400 text-amber-800'
+                        }`}
+                      >
+                        {lockedComponents[selectedComponent.id] ? (
+                          <>
+                            <Lock className="w-3 h-3" />
+                            <span className="flex items-center gap-1"><Check className="w-2.5 h-2.5" /> LOCKED</span>
+                          </>
+                        ) : (
+                          <>
+                            <Unlock className="w-3 h-3" />
+                            <span>UNLOCKED</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Right: Collapsible Telemetry Dashboard */}
+            <div
+              className={`relative transition-all duration-300 ease-in-out shrink-0 overflow-hidden flex flex-col h-full border-l ${
+                isDark ? 'border-[#1d2631] bg-[#0d1219]' : 'border-slate-200 bg-white'
+              } ${isSidebarOpen ? 'w-96 opacity-100' : 'w-0 border-l-0 opacity-0 pointer-events-none'}`}
+            >
+              <div className="w-96 h-full flex flex-col overflow-hidden">
+                <TelemetryDashboard
+                  telemetry={telemetry}
+                  components={components}
+                  onInspectComponent={handleOpenInspector}
+                  onClose={() => setIsSidebarOpen(false)}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Controls Bar */}
+          <BottomControls
+            isRunning={isRunning}
+            activeScenario={activeScenario}
+            viewMode={viewMode}
+            onStart={handleStart}
+            onPause={handlePause}
+            onReset={handleReset}
+            onSelectScenario={handleSelectScenario}
+            onCheckConnections={() => setActiveModal('CIRCUIT_VALIDATOR')}
           />
-          <button
-            className="btn tiny px-4 py-2"
-            onClick={handleSendCommand}
-            style={{ background: '#0284c7', color: '#fff', fontWeight: 800, border: 'none', borderRadius: 6, cursor: 'pointer' }}
-          >
-            SEND ▶
-          </button>
-        </div>
+        </>
+      )}
 
-      </div>
+      {/* Modals */}
+      {activeModal === 'INSPECTOR' && selectedComponent && (
+        <ComponentInspectorModal
+          component={selectedComponent}
+          telemetry={telemetry}
+          onClose={() => {
+            setActiveModal(null);
+            setSelectedComponent(null);
+          }}
+        />
+      )}
 
+      {activeModal === 'VALIDATOR' && (
+        <ComponentLockValidationPanel
+          components={components}
+          wires={wires}
+          lockedComponents={lockedComponents}
+          onToggleLock={handleToggleLock}
+          onLockAll={handleLockAll}
+          onUnlockAll={handleUnlockAll}
+          routingMode={routingMode}
+          onToggleRoutingMode={(mode) => setRoutingMode(mode)}
+          onRunLiveTrace={handleRunLiveTrace}
+          onClose={() => setActiveModal(null)}
+        />
+      )}
+
+      {activeModal === 'CIRCUIT_VALIDATOR' && (
+        <ConnectionValidationModal
+          wires={wires}
+          onClose={() => setActiveModal(null)}
+        />
+      )}
+
+      {activeModal === 'LOAD_CELL_CONFIG' && (
+        <LoadCellConfigModal
+          currentConfig={loadCellConfig}
+          onSaveConfig={(cfg) => setLoadCellConfig(cfg)}
+          onClose={() => setActiveModal(null)}
+        />
+      )}
+
+      {activeModal === 'REAL_HARDWARE' && realProviderRef.current && (
+        <RealHardwareModal
+          realProvider={realProviderRef.current}
+          onConnected={() => setActiveProvider('REAL_HARDWARE')}
+          onDisconnected={() => setActiveProvider('SIMULATION')}
+          onClose={() => setActiveModal(null)}
+        />
+      )}
     </div>
   );
 }

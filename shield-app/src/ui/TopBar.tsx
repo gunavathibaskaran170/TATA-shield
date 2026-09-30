@@ -165,6 +165,29 @@ export function TopBar() {
         </select>
       </label>
 
+      {/* Hardware Live Link Badge */}
+      <button
+        className="btn tiny"
+        onClick={() => navigate('hardware')}
+        title="Open Hardware Live Gateway & Diagnostics"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '3px 9px',
+          background: 'rgba(16,185,129,0.12)',
+          border: '1px solid rgba(16,185,129,0.4)',
+          borderRadius: 5,
+          color: '#34d399',
+          fontWeight: 600,
+          fontSize: 11,
+          cursor: 'pointer',
+        }}
+      >
+        <span className="dot dot-normal" style={{ width: 6, height: 6 }} />
+        <span>HW: COM5 LIVE</span>
+      </button>
+
       {/* Vehicle ID & Passport Button */}
       <div className="row" style={{ gap: 6 }}>
         <button

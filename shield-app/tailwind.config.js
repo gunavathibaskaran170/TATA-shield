@@ -1,6 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: ['./index.html', './src/**/*.{ts,tsx}'],
+  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
@@ -14,8 +15,8 @@ export default {
         hv: '#ff8a2a',
       },
       fontFamily: {
-        sans: ['"Segoe UI"', 'Inter', 'system-ui', 'sans-serif'],
-        mono: ['"Cascadia Mono"', 'Consolas', 'monospace'],
+        sans: ['"Plus Jakarta Sans"', 'Inter', '"Segoe UI"', 'system-ui', 'sans-serif'],
+        mono: ['"JetBrains Mono"', '"Cascadia Mono"', 'Consolas', 'monospace'],
       },
     },
   },
