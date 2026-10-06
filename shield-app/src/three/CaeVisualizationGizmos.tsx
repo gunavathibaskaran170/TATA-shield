@@ -30,6 +30,7 @@ export const CaeVisualizationGizmos: React.FC<CaeVisualizationProps> = ({
   const caeProbeActive = useStore((s) => s.caeProbeActive);
   const caeProbeData = useStore((s) => s.caeProbeData);
   const setCaeProbeData = useStore((s) => s.setCaeProbeData);
+  const wireframeOpacity = useStore((s) => s.wireframeOpacity);
   const activeCae = CAE_LOAD_CASES[activeCaeLoadCase] || CAE_LOAD_CASES.battery_enclosure;
 
   const pulseRef = useRef<number>(0);
@@ -150,11 +151,11 @@ export const CaeVisualizationGizmos: React.FC<CaeVisualizationProps> = ({
           <group position={config.highlightBox.pos}>
             <mesh>
               <boxGeometry args={config.highlightBox.size} />
-              <meshBasicMaterial color="#0284c7" transparent opacity={0.15} depthWrite={false} />
+              <meshBasicMaterial color="#0284c7" transparent opacity={Math.min(0.8, 0.25 * wireframeOpacity * 2.5)} depthWrite={false} />
             </mesh>
             <lineSegments>
               <edgesGeometry args={[new THREE.BoxGeometry(...config.highlightBox.size)]} />
-              <lineBasicMaterial color="#38bdf8" transparent opacity={0.8} linewidth={2} />
+              <lineBasicMaterial color="#38bdf8" transparent opacity={Math.min(1.0, 0.8 * wireframeOpacity * 1.25)} linewidth={2} />
             </lineSegments>
           </group>
 

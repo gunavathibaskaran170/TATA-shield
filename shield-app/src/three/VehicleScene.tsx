@@ -484,11 +484,11 @@ export function VehicleScene() {
         gl={glRenderer}
         onPointerMissed={() => useStore.getState().clearSelection()}
       >
-        <color attach="background" args={[isSkeletal ? (cadView ? '#f0f3f6' : '#ffffff') : '#e4e8ef']} />
-        <fog attach="fog" args={[isSkeletal ? (cadView ? '#f0f3f6' : '#ffffff') : '#e4e8ef', 22, 65]} />
+        <color attach="background" args={['#101821']} />
+        <fog attach="fog" args={['#101821', 22, 65]} />
 
-        <ambientLight intensity={isSkeletal ? (cadView ? 0.7 : 0.8) : 0.9} />
-        <hemisphereLight args={['#ffffff', isSkeletal ? '#b9c0c5' : '#7f8c9d', 1.1]} />
+        <ambientLight intensity={isSkeletal ? (cadView ? 0.75 : 0.85) : 0.95} />
+        <hemisphereLight args={['#ffffff', isSkeletal ? '#263544' : '#1f2b38', 1.1]} />
         <directionalLight
           position={[5, 8, 4]}
           intensity={isSkeletal ? (cadView ? 1.5 : 1.3) : 1.8}
@@ -499,12 +499,12 @@ export function VehicleScene() {
           shadow-camera-top={7}
           shadow-camera-bottom={-7}
         />
-        <directionalLight position={[-5, 3, -4]} intensity={isSkeletal ? 0.6 : 0.8} color="#8fb8e8" />
+        <directionalLight position={[-5, 3, -4]} intensity={isSkeletal ? 0.6 : 0.8} color="#16A8E0" />
         <directionalLight position={[0, 1.5, 5]} intensity={isSkeletal ? 0.35 : 0.5} color="#ffe3c4" />
         {/* soft contact shadow catcher under the assembly */}
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.62, 0]} receiveShadow>
           <planeGeometry args={[40, 40]} />
-          <shadowMaterial opacity={isSkeletal ? 0.18 : 0.25} />
+          <shadowMaterial opacity={isSkeletal ? 0.35 : 0.45} />
         </mesh>
 
         {/* procedural studio environment — no network assets */}
@@ -522,10 +522,10 @@ export function VehicleScene() {
             position={[0, 0.002, 0]}
             cellSize={0.5}
             cellThickness={0.6}
-            cellColor="#b0bcc9"
+            cellColor="#1F2B38"
             sectionSize={2.5}
             sectionThickness={1.2}
-            sectionColor="#8898aa"
+            sectionColor="#263544"
             fadeDistance={28}
             fadeStrength={2.2}
             infiniteGrid
@@ -549,7 +549,7 @@ export function VehicleScene() {
 
         {isSkeletal && (cadView && explode > 0.05 ? <ExplodedOverlays /> : <LoadPathArrows />)}
         {isSkeletal && <ClipGizmos />}
-        <WorkbenchGizmos />
+        {page !== 'digital_eng' && <WorkbenchGizmos />}
         {page === 'digital_eng' && (
           <CaeVisualizationGizmos
             caeState={caeState}
@@ -562,60 +562,7 @@ export function VehicleScene() {
         <FitRig />
       </Canvas>
 
-      {/* Floating Viewport HUD Control Pill for Wireframe Shell Opacity Adjustment */}
-      <div
-        style={{
-          position: 'absolute',
-          bottom: 16,
-          right: 16,
-          zIndex: 10,
-          background: 'rgba(12, 16, 22, 0.88)',
-          backdropFilter: 'blur(12px)',
-          border: '1px solid rgba(6, 182, 212, 0.4)',
-          borderRadius: 8,
-          padding: '8px 12px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
-          pointerEvents: 'auto',
-        }}
-      >
-        <span style={{ color: '#00e5ff', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          🔷 Shell Net Opacity
-        </span>
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.01}
-          value={wireframeOpacity}
-          onChange={(e) => setWireframeOpacity(parseFloat(e.target.value))}
-          style={{ width: 110, height: 14, accentColor: '#00e5ff', cursor: 'pointer' }}
-        />
-        <span className="mono" style={{ color: '#67e8f9', fontSize: 11, fontWeight: 700, width: 36, textAlign: 'right' }}>
-          {Math.round(wireframeOpacity * 100)}%
-        </span>
-        <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.15)', margin: '0 2px' }} />
-        {[0, 0.25, 0.5, 0.75, 1].map((val) => (
-          <button
-            key={val}
-            onClick={() => setWireframeOpacity(val)}
-            style={{
-              padding: '2px 5px',
-              fontSize: 10,
-              fontWeight: 700,
-              borderRadius: 3,
-              background: Math.abs(wireframeOpacity - val) < 0.05 ? '#0891b2' : 'rgba(255,255,255,0.06)',
-              border: '1px solid ' + (Math.abs(wireframeOpacity - val) < 0.05 ? '#06b6d4' : 'rgba(255,255,255,0.12)'),
-              color: Math.abs(wireframeOpacity - val) < 0.05 ? '#fff' : '#94a3b8',
-              cursor: 'pointer',
-            }}
-          >
-            {Math.round(val * 100)}%
-          </button>
-        ))}
-      </div>
+
     </div>
   );
 }

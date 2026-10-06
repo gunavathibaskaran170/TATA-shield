@@ -309,17 +309,7 @@ for (let i = 0; i <= 21; i++) DEFAULT_LAYER_OPACITY[i] = 1;
 
 export const useStore = create<Store>((set, get) => ({
   page: 'digital_eng',
-  navigate: (p) => {
-    // Map legacy/removed page routes to primary workflow stages
-    const routeMap: Record<string, PageKey> = {
-      forensics: 'live_twin',
-      fleet: 'live_twin',
-      investigations: 'live_twin',
-      reports: 'live_twin',
-    };
-    const targetPage = routeMap[p] ?? p;
-    set({ page: targetPage });
-  },
+  navigate: (p) => set({ page: p }),
 
   vehicleId: 'EV-DEMO-0287',
 

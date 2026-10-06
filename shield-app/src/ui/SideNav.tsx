@@ -6,7 +6,6 @@ interface NavItem {
   label: string;
   icon: string;
   badge?: string;
-  stageNum?: number;
   completed?: boolean;
   warning?: boolean;
   critical?: boolean;
@@ -22,7 +21,6 @@ export function SideNav() {
   const navigate = useStore((s) => s.navigate);
   const sensorLive = useStore((s) => s.sensorLive);
 
-  // Determine stage status indicators based on live telemetry & state
   const hasCritical = Object.values(sensorLive).some((s) => s.analytics.state === 'INSPECTION_REQUIRED');
   const hasWatch = Object.values(sensorLive).some((s) => s.analytics.state === 'WATCH');
 
@@ -30,53 +28,24 @@ export function SideNav() {
     {
       title: 'ENGINEERING LIFECYCLE',
       items: [
-        {
-          key: 'digital_eng',
-          label: '01 Design & CAE',
-          icon: '△',
-          badge: 'CAE',
-          stageNum: 1,
-          completed: page !== 'digital_eng',
-        },
-        {
-          key: 'mfg_quality',
-          label: '02 Build & Baseline',
-          icon: '⚙',
-          badge: 'MFG',
-          stageNum: 2,
-          completed: page === 'controlled_val' || page === 'live_twin',
-        },
-        {
-          key: 'controlled_val',
-          label: '03 Validate',
-          icon: '◈',
-          badge: 'TEST',
-          stageNum: 3,
-          completed: page === 'live_twin',
-        },
-        {
-          key: 'live_twin',
-          label: '04 Monitor',
-          icon: '◌',
-          badge: 'LIVE',
-          stageNum: 4,
-          warning: hasWatch && !hasCritical,
-          critical: hasCritical,
-        },
+        { key: 'digital_eng', label: '01 Design & CAE', icon: '△', badge: 'CAE', completed: page !== 'digital_eng' },
+        { key: 'mfg_quality', label: '02 Build & Baseline', icon: '⚙', badge: 'MFG', completed: page === 'controlled_val' || page === 'live_twin' },
+        { key: 'controlled_val', label: '03 Validate', icon: '◇', badge: 'TEST', completed: page === 'live_twin' },
+        { key: 'live_twin', label: '04 Monitor', icon: '○', badge: 'LIVE', warning: hasWatch && !hasCritical, critical: hasCritical },
       ],
     },
     {
       title: 'OVERVIEW & WORKSHOP',
       items: [
         { key: 'command', label: 'Command Center', icon: '◆' },
-        { key: 'workbench', label: 'Manual Engineering Workbench', icon: '🛠', badge: 'LAB' },
-        { key: 'hardware', label: 'Hardware Live Diagnostics', icon: '⚡', badge: 'ESP32' },
+        { key: 'workbench', label: 'Manual Engineering Workbench', icon: '⚒' },
+        { key: 'hardware', label: 'Hardware Live Diagnostic', icon: '⚡' },
       ],
     },
     {
       title: 'TRACEABILITY',
       items: [
-        { key: 'passport', label: 'Vehicle Digital Passport', icon: '▣', badge: 'ISO' },
+        { key: 'passport', label: 'Vehicle Digital Passport', icon: '▣' },
       ],
     },
   ];
@@ -85,46 +54,61 @@ export function SideNav() {
     <aside
       className="desktop-only"
       style={{
-        width: 228,
-        background: 'var(--bg2)',
-        borderRight: '1px solid var(--line)',
+        width: 225,
+        background: '#0C121B',
+        borderRight: '1px solid #1E2936',
         display: 'flex',
         flexDirection: 'column',
         flex: 'none',
+        height: '100%',
+        userSelect: 'none',
       }}
     >
-      {/* SHIELD BRANDING HEADER */}
-      <div style={{ padding: '10px 12px 8px', borderBottom: '1px solid var(--line)' }}>
-        <div className="row" style={{ gap: 8 }}>
+      {/* BRANDING HEADER */}
+      <div style={{ padding: '14px 16px 12px', borderBottom: '1px solid #1E2936' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div
             style={{
-              width: 28, height: 28, borderRadius: 5, flex: 'none',
-              background: 'linear-gradient(135deg, #0f4c4c, #0b2430)',
-              border: '1px solid #1d5c5c', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: 'var(--cyan)', fontSize: 14, fontWeight: 600, fontFamily: 'var(--mono)',
+              width: 32,
+              height: 32,
+              borderRadius: 6,
+              flex: 'none',
+              background: 'linear-gradient(135deg, #16A8E0, #0C121B)',
+              border: '1px solid #16A8E0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#FFFFFF',
+              fontSize: 15,
+              fontWeight: 700,
+              fontFamily: 'var(--font-sans)',
             }}
           >
             S
           </div>
           <div>
-            <div style={{ fontWeight: 600, letterSpacing: '-0.2px', fontSize: 14, color: '#E6EDF5' }}>SHIELD EV</div>
-            <div className="secondary-text" style={{ marginTop: 1, fontSize: 10, fontWeight: 400, color: '#71849A' }}>Automotive Structural Intelligence</div>
+            <div style={{ fontWeight: 600, fontSize: 16, color: '#F2F5F8', letterSpacing: '-0.01em', lineHeight: 1.1 }}>
+              SHIELD EV
+            </div>
+            <div style={{ marginTop: 2, fontSize: 11, color: '#6F8093', fontWeight: 400 }}>
+              Automotive Structural Intelligence
+            </div>
           </div>
         </div>
       </div>
 
       {/* NAVIGATION TREE */}
-      <nav style={{ flex: 1, overflowY: 'auto', padding: '6px 6px' }}>
+      <nav style={{ flex: 1, overflowY: 'auto', padding: '12px 10px' }}>
         {GROUPS.map((g) => (
-          <div key={g.title} style={{ marginBottom: 8 }}>
+          <div key={g.title} style={{ marginBottom: 16 }}>
             <div
               style={{
-                padding: '3px 6px',
-                color: '#52677D',
+                padding: '0 8px 6px',
+                color: '#6F8093',
                 textTransform: 'uppercase',
-                letterSpacing: '0.4px',
-                fontWeight: 500,
-                fontSize: 10,
+                letterSpacing: '0.08em',
+                fontWeight: 600,
+                fontSize: 11,
               }}
             >
               {g.title}
@@ -136,27 +120,42 @@ export function SideNav() {
                   key={n.key}
                   onClick={() => navigate(n.key)}
                   style={{
+                    position: 'relative',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 8,
+                    gap: 10,
                     width: '100%',
+                    height: 38,
                     textAlign: 'left',
-                    padding: '4px 6px',
-                    margin: '1px 0',
-                    borderRadius: 5,
+                    padding: '0 10px 0 12px',
+                    margin: '2px 0',
+                    borderRadius: 6,
                     cursor: 'pointer',
-                    background: active
-                      ? 'linear-gradient(90deg, rgba(6,182,212,0.18), rgba(15,23,42,0.6))'
-                      : 'transparent',
-                    border: active ? '1px solid #06b6d4' : '1px solid transparent',
-                    color: active ? '#38bdf8' : 'var(--muted)',
+                    background: active ? 'rgba(22, 168, 224, 0.12)' : 'transparent',
+                    border: 'none',
+                    color: active ? '#F2F5F8' : '#A8B4C2',
                     fontSize: 13,
-                    fontFamily: 'inherit',
-                    fontWeight: 500,
+                    fontFamily: 'var(--font-sans)',
+                    fontWeight: active ? 600 : 400,
                     transition: 'all 0.12s ease',
                   }}
                 >
-                  <span style={{ width: 14, textAlign: 'center', fontSize: 12, color: active ? '#38bdf8' : 'var(--faint)' }}>
+                  {/* Small cyan left indicator for active state */}
+                  {active && (
+                    <span
+                      style={{
+                        position: 'absolute',
+                        left: 0,
+                        top: 8,
+                        bottom: 8,
+                        width: 3,
+                        borderRadius: '0 2px 2px 0',
+                        background: '#16A8E0',
+                      }}
+                    />
+                  )}
+
+                  <span style={{ width: 16, textAlign: 'center', fontSize: 13, color: active ? '#16A8E0' : '#6F8093' }}>
                     {n.icon}
                   </span>
 
@@ -164,23 +163,22 @@ export function SideNav() {
                     {n.label}
                   </span>
 
-                  {/* Status Indicator Dots */}
-                  {n.completed && !active && <span style={{ fontSize: 9, color: '#10b981' }}>✓</span>}
-                  {n.warning && <span style={{ fontSize: 9, color: '#f59e0b' }}>●</span>}
-                  {n.critical && <span style={{ fontSize: 9, color: '#ef4444' }} className="animate-ping">●</span>}
+                  {/* Status Indicators */}
+                  {n.completed && !active && <span style={{ fontSize: 10, color: '#20C997' }}>✓</span>}
+                  {n.warning && <span style={{ fontSize: 10, color: '#F2B84B' }}>●</span>}
+                  {n.critical && <span style={{ fontSize: 10, color: '#EF5B5B' }}>●</span>}
 
-                  {/* Stage Code Badge */}
+                  {/* Code Badge */}
                   {n.badge && (
                     <span
                       style={{
-                        fontSize: 8.5,
-                        fontFamily: 'var(--mono)',
-                        padding: '1px 4px',
+                        fontSize: 9.5,
+                        fontFamily: 'var(--font-mono)',
+                        padding: '1px 5px',
                         borderRadius: 3,
-                        background: active ? 'rgba(56,189,248,0.25)' : 'rgba(255,255,255,0.06)',
-                        color: active ? '#38bdf8' : 'var(--faint)',
-                        border: active ? '1px solid rgba(56,189,248,0.5)' : '1px solid transparent',
-                        fontWeight: 500,
+                        background: active ? 'rgba(22, 168, 224, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+                        color: active ? '#16A8E0' : '#6F8093',
+                        fontWeight: 600,
                       }}
                     >
                       {n.badge}
@@ -192,12 +190,6 @@ export function SideNav() {
           </div>
         ))}
       </nav>
-
-      {/* FOOTER */}
-      <div style={{ padding: '10px 14px', borderTop: '1px solid var(--line)', fontSize: 10, color: 'var(--faint)' }}>
-        SHIELD Connected Engineering Thread<br />
-        <span className="prov prov-verified">DESIGN → BUILD → VALIDATE → MONITOR</span>
-      </div>
     </aside>
   );
 }
