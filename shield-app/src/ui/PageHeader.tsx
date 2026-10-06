@@ -18,18 +18,18 @@ interface PageHeaderProps {
 export function PageHeader({ title, description, badge, badgeType = 'default', actions, children }: PageHeaderProps) {
   const rightControls = actions || children;
   const badgeColors = {
-    default: { bg: 'rgba(34, 211, 238, 0.12)', color: '#22D3EE', border: 'rgba(34, 211, 238, 0.3)' },
-    success: { bg: 'rgba(52, 211, 153, 0.12)', color: '#34D399', border: 'rgba(52, 211, 153, 0.3)' },
-    warning: { bg: 'rgba(251, 191, 36, 0.12)', color: '#FBBF24', border: 'rgba(251, 191, 36, 0.3)' },
-    critical: { bg: 'rgba(248, 113, 113, 0.12)', color: '#F87171', border: 'rgba(248, 113, 113, 0.3)' },
+    default: { bg: 'rgba(22, 168, 224, 0.12)', color: '#16A8E0', border: 'rgba(22, 168, 224, 0.3)' },
+    success: { bg: 'rgba(32, 201, 151, 0.12)', color: '#20C997', border: 'rgba(32, 201, 151, 0.3)' },
+    warning: { bg: 'rgba(242, 184, 75, 0.12)', color: '#F2B84B', border: 'rgba(242, 184, 75, 0.3)' },
+    critical: { bg: 'rgba(239, 91, 91, 0.12)', color: '#EF5B5B', border: 'rgba(239, 91, 91, 0.3)' },
   }[badgeType];
 
   return (
     <header
       style={{
-        padding: '14px 20px 12px 20px',
-        background: '#0d1219',
-        borderBottom: '1px solid #1d2631',
+        padding: '12px 20px',
+        background: '#101821',
+        borderBottom: '1px solid #1F2B38',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -45,11 +45,11 @@ export function PageHeader({ title, description, badge, badgeType = 'default', a
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <h1
             style={{
-              fontSize: 22,
+              fontSize: 24,
               fontWeight: 600,
               lineHeight: 1.2,
               letterSpacing: '-0.01em',
-              color: '#F8FAFC',
+              color: '#F2F5F8',
               fontFamily: 'var(--font-sans)',
               margin: 0,
             }}
@@ -60,10 +60,10 @@ export function PageHeader({ title, description, badge, badgeType = 'default', a
           {badge && (
             <span
               style={{
-                fontSize: 10,
-                fontWeight: 500,
+                fontSize: 10.5,
+                fontWeight: 600,
                 letterSpacing: '0.04em',
-                padding: '2px 6px',
+                padding: '2px 7px',
                 borderRadius: 4,
                 background: badgeColors.bg,
                 color: badgeColors.color,
@@ -84,7 +84,7 @@ export function PageHeader({ title, description, badge, badgeType = 'default', a
               fontSize: 13,
               fontWeight: 400,
               lineHeight: 1.4,
-              color: '#94A3B8',
+              color: '#A8B4C2',
               fontFamily: 'var(--font-sans)',
               margin: 0,
             }}

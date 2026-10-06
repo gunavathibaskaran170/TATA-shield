@@ -38,186 +38,140 @@ export function TopBar() {
   const pageTitle: Record<string, string> = {
     command: 'Command Center',
     workbench: 'Manual Engineering Workbench',
-    digital_eng: '01 Design & CAE Validation',
-    mfg_quality: '02 Manufacturing & Baseline',
-    controlled_val: '03 Vehicle Testing & Validation',
-    road_corr: '03 Vehicle Testing — Road Correlation',
-    live_twin: '04 Live Structural Health',
-    eng_analytics: '04 Structural Analytics & Diagnostics',
+    digital_eng: '01 Design & CAE',
+    mfg_quality: '02 Build & Baseline',
+    controlled_val: '03 Validate',
+    live_twin: '04 Monitor',
     passport: 'Vehicle Digital Passport',
-    twin: '3D Vehicle Digital Twin',
-    intelligence: 'Structural Intelligence',
-    manufacturing: 'Manufacturing Thread',
-    telemetry: 'Live Telemetry Stream',
     hardware: 'Hardware Live Diagnostic',
-    fleet: 'Fleet Structural Health',
-    forensics: 'Event Forensics Replay',
-    diagnostics: 'AI Diagnostics',
-    investigations: 'Engineering Investigations',
-    reports: 'Event History & Records',
-    settings: 'Settings & Data Sources',
   };
 
   return (
     <header
       style={{
-        height: 50,
+        height: 52,
         flex: 'none',
         display: 'flex',
         alignItems: 'center',
+        justifyContent: 'space-between',
         gap: 12,
-        padding: '0 14px',
-        background: 'var(--bg2)',
-        borderBottom: '1px solid var(--line)',
-        zIndex: 6,
+        padding: '0 16px',
+        background: '#0C121B',
+        borderBottom: '1px solid #1F2B38',
+        zIndex: 10,
         position: 'relative',
       }}
     >
-      <div className="row" style={{ gap: 8, minWidth: 240 }}>
-        <span style={{ margin: 0, fontSize: 14, fontWeight: 600, letterSpacing: '-0.2px', color: '#E6EDF5' }}>
-          {pageTitle[page] ?? 'SHIELD EV'}
+      {/* LEFT: Page Context */}
+      <div className="row" style={{ gap: 8 }}>
+        <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em', color: '#F2F5F8' }}>
+          {pageTitle[page] ?? '01 Design & CAE Validation'}
         </span>
       </div>
 
-      {/* CONTINUOUS 4-STAGE LIFECYCLE THREAD RIBBON */}
-      <div
-        className="desktop-only row"
-        style={{
-          flex: 1,
-          justifyContent: 'center',
-          gap: 6,
-          background: 'rgba(0,0,0,0.35)',
-          padding: '3px 10px',
-          borderRadius: 6,
-          border: '1px solid var(--line)',
-          maxWidth: 620,
-        }}
-      >
-        {LIFECYCLE_RIBBON.map((r, i) => {
-          const currentStageIndex =
-            page === 'mfg_quality' ? 1 : page === 'controlled_val' ? 2 : page === 'live_twin' ? 3 : 0;
-          const isCompleted = i < currentStageIndex;
-          const isCurrent = i === currentStageIndex;
-          const iconSymbol = isCompleted ? '✓' : isCurrent ? '●' : '○';
+      {/* RIGHT: Utility Controls */}
+      <div className="row" style={{ gap: 12 }}>
+        {/* Scenario Selector */}
+        <label className="desktop-only row" style={{ gap: 6 }} title="Drives mock telemetry generator">
+          <span style={{ fontSize: 11.5, color: '#A8B4C2' }}>Scenario</span>
+          <select
+            value={scenario}
+            onChange={(e) => setScenario(e.target.value)}
+            style={{
+              height: 32,
+              fontSize: 12,
+              padding: '0 8px',
+              borderRadius: 6,
+              background: '#131D28',
+              border: '1px solid #1F2B38',
+              color: '#F2F5F8',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}
+          >
+            <option value="cruise">Baseline cruise</option>
+            <option value="urban">Urban / rough</option>
+            <option value="pothole_replay">Pothole replay</option>
+            <option value="rear_load">Rear load</option>
+            <option value="thermal">Thermal soak</option>
+          </select>
+        </label>
 
-          return (
-            <div key={r.stage} className="row" style={{ gap: 4, alignItems: 'center' }}>
-              <button
-                onClick={() => navigate(r.targetPage)}
-                style={{
-                  padding: '3px 10px',
-                  fontSize: 12,
-                  fontFamily: 'var(--font-sans)',
-                  fontWeight: 500,
-                  borderRadius: 4,
-                  border: isCurrent ? '1px solid #06b6d4' : '1px solid transparent',
-                  background: isCurrent ? 'linear-gradient(135deg, #0891b2, #0e7490)' : 'transparent',
-                  color: isCurrent ? '#fff' : isCompleted ? '#34d399' : 'var(--muted)',
-                  cursor: 'pointer',
-                  transition: 'all 0.12s ease',
-                  whiteSpace: 'nowrap',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 5,
-                }}
-                title={`Stage 0${i + 1}: ${r.stage}`}
-              >
-                <span style={{ fontSize: 10, color: isCurrent ? '#38bdf8' : isCompleted ? '#10b981' : 'var(--faint)' }}>
-                  {iconSymbol}
-                </span>
-                <span>{r.label}</span>
-                <span
-                  style={{
-                    fontSize: 8.5,
-                    padding: '0.5px 3.5px',
-                    borderRadius: 3,
-                    background: isCurrent ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.06)',
-                    color: isCurrent ? '#fff' : 'var(--faint)',
-                    fontWeight: 500,
-                  }}
-                >
-                  {r.badge}
-                </span>
-              </button>
-              {i < LIFECYCLE_RIBBON.length - 1 && (
-                <span style={{ fontSize: 10, color: 'var(--faint)', margin: '0 2px' }}>→</span>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="spacer" />
-
-      {/* Scenario Selector */}
-      <label className="desktop-only row" style={{ gap: 6 }} title="Drives the mock telemetry generator">
-        <span className="tiny muted">Scenario</span>
-        <select
-          value={scenario}
-          onChange={(e) => setScenario(e.target.value)}
-          style={{ width: 120, fontSize: 11, padding: '3px 6px' }}
-        >
-          <option value="cruise">Baseline cruise</option>
-          <option value="urban">Urban / rough</option>
-          <option value="pothole_replay">Pothole replay</option>
-          <option value="rear_load">Rear load</option>
-          <option value="thermal">Thermal soak</option>
-        </select>
-      </label>
-
-      {/* Hardware Live Link Badge */}
-      <button
-        className="btn tiny"
-        onClick={() => navigate('hardware')}
-        title="Open Hardware Live Gateway & Diagnostics"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          padding: '3px 9px',
-          background: 'rgba(16,185,129,0.12)',
-          border: '1px solid rgba(16,185,129,0.4)',
-          borderRadius: 5,
-          color: '#34d399',
-          fontWeight: 600,
-          fontSize: 11,
-          cursor: 'pointer',
-        }}
-      >
-        <span className="dot dot-normal" style={{ width: 6, height: 6 }} />
-        <span>HW: COM5 LIVE</span>
-      </button>
-
-      {/* Vehicle ID & Passport Button */}
-      <div className="row" style={{ gap: 6 }}>
+        {/* Hardware Live Link Badge */}
         <button
-          className="btn tiny"
+          onClick={() => navigate('hardware')}
+          title="Open Hardware Live Gateway & Diagnostics"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            height: 32,
+            padding: '0 10px',
+            background: 'rgba(32, 201, 151, 0.1)',
+            border: '1px solid rgba(32, 201, 151, 0.3)',
+            borderRadius: 6,
+            color: '#20C997',
+            fontWeight: 600,
+            fontSize: 11.5,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+          }}
+        >
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#20C997' }} />
+          <span>HW: COM5 LIVE</span>
+        </button>
+
+        {/* Vehicle ID & Passport Button */}
+        <button
           onClick={() => navigate('passport')}
           title="Open Vehicle Digital Passport"
-          style={{ padding: '3px 8px' }}
+          style={{
+            height: 32,
+            padding: '0 10px',
+            background: '#131D28',
+            border: '1px solid #1F2B38',
+            borderRadius: 6,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+          }}
         >
-          <span className="mono" style={{ color: 'var(--cyan)', fontWeight: 700 }}>{vehicleId}</span>
+          <span className="mono" style={{ color: '#16A8E0', fontWeight: 600, fontSize: 12 }}>
+            {vehicleId}
+          </span>
         </button>
-      </div>
 
-      {/* Health Status Chip */}
-      <span
-        className={
-          'chip ' +
-          (worst ? 'st-' + (worst === 'INSPECTION_REQUIRED' ? 'inspection' : worst === 'WATCH' ? 'watch' : 'normal') : 'st-normal')
-        }
-        style={{ fontSize: 11, padding: '3px 8px' }}
-      >
+        {/* Health Status Chip */}
         <span
-          className={
-            'dot ' +
-            (worst ? 'dot-' + (worst === 'INSPECTION_REQUIRED' ? 'inspection' : worst === 'WATCH' ? 'watch' : 'normal') : 'dot-normal')
-          }
-        />
-        {liveCount}/{SENSORS.length} sensors · {worst ?? 'NORMAL'}
-      </span>
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            height: 32,
+            padding: '0 10px',
+            borderRadius: 6,
+            fontSize: 11.5,
+            fontWeight: 500,
+            background: worst === 'INSPECTION_REQUIRED' ? 'rgba(239, 91, 91, 0.12)' : worst === 'WATCH' ? 'rgba(242, 184, 75, 0.12)' : 'rgba(32, 201, 151, 0.1)',
+            border: `1px solid ${worst === 'INSPECTION_REQUIRED' ? 'rgba(239, 91, 91, 0.3)' : worst === 'WATCH' ? 'rgba(242, 184, 75, 0.3)' : 'rgba(32, 201, 151, 0.3)'}`,
+            color: worst === 'INSPECTION_REQUIRED' ? '#EF5B5B' : worst === 'WATCH' ? '#F2B84B' : '#20C997',
+          }}
+        >
+          <span
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              background: worst === 'INSPECTION_REQUIRED' ? '#EF5B5B' : worst === 'WATCH' ? '#F2B84B' : '#20C997',
+            }}
+          />
+          {liveCount}/{SENSORS.length} sensors · {worst ?? 'NORMAL'}
+        </span>
 
-      <span className="mono small faint">{clock.toLocaleTimeString('en-IN', { hour12: false })}</span>
+        {/* Clock */}
+        <span className="mono" style={{ fontSize: 11.5, color: '#6F8093', marginLeft: 4 }}>
+          {clock.toLocaleTimeString('en-IN', { hour12: false })}
+        </span>
+      </div>
     </header>
   );
 }

@@ -22,6 +22,8 @@ export const WorkbenchGizmos: React.FC = () => {
   const isAmplified = useStore((s) => s.isDeformationAmplified);
   const loadMode = useStore((s) => s.loadMode);
   const contourMode = useStore((s) => s.contourMode);
+  const caeStep = useStore((s) => s.caeStep);
+  const caeState = useStore((s) => s.caeState);
 
   const profile = HARDPOINT_PROFILES[activeHardpointId] || HARDPOINT_PROFILES.front_rail_lh;
   const forceKn = forceN / 1000;
@@ -150,19 +152,21 @@ export const WorkbenchGizmos: React.FC = () => {
         <meshBasicMaterial color={hotspotColor} transparent opacity={0.25} wireframe />
       </mesh>
 
-      {/* PEAK RESPONSE MAX MARKER TAG */}
-      <Html position={[pos[0], pos[1] + 0.35, pos[2]]} center>
-        <div className="px-2 py-0.5 rounded bg-red-950/95 border-2 border-red-500 text-red-100 font-mono text-[11px] font-extrabold shadow-2xl flex items-center gap-1.5 animate-bounce">
-          <span className="bg-red-600 text-white px-1 rounded text-[9px]">MAX</span>
-          <span>
-            {contourMode === 'strain'
-              ? `${physics.calculatedStrainMicro} µε`
-              : contourMode === 'displacement'
-              ? `${physics.displacementMm} mm`
-              : `${physics.calculatedStressMpa} MPa`}
-          </span>
-        </div>
-      </Html>
+      {/* PEAK RESPONSE MAX MARKER TAG (ONLY SHOWN IN STEP 8 RESULTS / RESULT STATE) */}
+      {(caeStep === 8 || caeState === 'RESULT') && (
+        <Html position={[pos[0], pos[1] + 0.35, pos[2]]} center>
+          <div className="px-2 py-0.5 rounded bg-red-950/95 border-2 border-red-500 text-red-100 font-mono text-[11px] font-extrabold shadow-2xl flex items-center gap-1.5 animate-bounce">
+            <span className="bg-red-600 text-white px-1 rounded text-[9px]">MAX</span>
+            <span>
+              {contourMode === 'strain'
+                ? `${physics.calculatedStrainMicro} µε`
+                : contourMode === 'displacement'
+                ? `${physics.displacementMm} mm`
+                : `${physics.calculatedStressMpa} MPa`}
+            </span>
+          </div>
+        </Html>
+      )}
 
       {/* Reaction Ground Support Boundary Fixed Icons (▲) */}
       {[-0.68, 0.68].map((rx, i) => (

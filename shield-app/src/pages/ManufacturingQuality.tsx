@@ -320,40 +320,41 @@ export function ManufacturingQuality() {
           <div
             style={{
               position: 'absolute',
-              bottom: 10,
+              bottom: 14,
               left: '50%',
               transform: 'translateX(-50%)',
               zIndex: 10,
               height: 38,
               padding: '0 12px',
-              background: 'rgba(17,26,36,0.92)',
-              backdropFilter: 'blur(8px)',
+              background: '#131D28',
               borderRadius: 8,
-              border: '1px solid rgba(0,166,214,0.4)',
+              border: '1px solid #1F2B38',
               display: 'flex',
               alignItems: 'center',
               gap: 12,
-              color: '#FFFFFF',
-              fontSize: 11,
-              fontFamily: 'var(--mono)',
+              color: '#F2F5F8',
+              fontSize: 12,
+              fontFamily: 'var(--font-sans)',
+              boxShadow: '0 8px 20px rgba(0,0,0,0.4)',
             }}
           >
-            <span style={{ color: '#94A3B8', fontWeight: 700 }}>VIEW MODE:</span>
+            <span style={{ color: '#A8B4C2', fontWeight: 500 }}>VIEW MODE:</span>
             <div style={{ display: 'flex', gap: 4 }}>
               {(['nominal', 'as_built', 'deviation'] as const).map((mode) => (
                 <button
                   key={mode}
                   onClick={() => setInspectionMode(mode)}
                   style={{
-                    padding: '3px 8px',
+                    padding: '4px 10px',
                     borderRadius: 4,
-                    fontSize: 10,
-                    fontWeight: 700,
+                    fontSize: 11,
+                    fontWeight: 500,
                     cursor: 'pointer',
-                    background: inspectionMode === mode ? '#00A6D6' : 'rgba(255,255,255,0.08)',
+                    background: inspectionMode === mode ? '#16A8E0' : 'rgba(255,255,255,0.05)',
                     color: '#FFFFFF',
-                    border: inspectionMode === mode ? '1px solid #38BDF8' : '1px solid transparent',
+                    border: inspectionMode === mode ? '1px solid #28B8EE' : '1px solid transparent',
                     textTransform: 'uppercase',
+                    fontFamily: 'var(--font-sans)',
                   }}
                 >
                   {mode.replace('_', ' ')}
@@ -361,7 +362,7 @@ export function ManufacturingQuality() {
               ))}
             </div>
 
-            <span style={{ color: '#94A3B8', fontWeight: 700, marginLeft: 8 }}>OPACITY:</span>
+            <span style={{ color: '#A8B4C2', fontWeight: 500, marginLeft: 4 }}>OPACITY:</span>
             <input
               type="range"
               min="0.0"
@@ -369,9 +370,9 @@ export function ManufacturingQuality() {
               step="0.05"
               value={wireframeOpacity}
               onChange={(e) => setWireframeOpacity(parseFloat(e.target.value))}
-              style={{ width: 70, accentColor: '#00A6D6', cursor: 'pointer' }}
+              style={{ width: 80, accentColor: '#16A8E0', cursor: 'pointer' }}
             />
-            <span style={{ fontWeight: 700, minWidth: 28, color: '#38BDF8' }}>{Math.round(wireframeOpacity * 100)}%</span>
+            <span className="mono" style={{ fontWeight: 600, minWidth: 32, color: '#16A8E0' }}>{Math.round(wireframeOpacity * 100)}%</span>
           </div>
 
         </div>

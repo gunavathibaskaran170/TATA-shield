@@ -69,7 +69,6 @@ const MOBILE_NAV: { key: PageKey; label: string }[] = [
 
 export function App() {
   const page = useStore((s) => s.page);
-  const navigate = useStore((s) => s.navigate);
   const Page = PAGES[page];
 
   return (
@@ -84,26 +83,6 @@ export function App() {
           </ErrorBoundary>
         </main>
       </div>
-
-      {/* mobile quick-nav */}
-      <nav
-        className="mobile-only"
-        style={{
-          display: 'flex', gap: 6, overflowX: 'auto', padding: '8px 10px',
-          background: 'var(--bg2)', borderTop: '1px solid var(--line)', flex: 'none',
-        }}
-      >
-        {MOBILE_NAV.map((n) => (
-          <button
-            key={n.key}
-            className={page === n.key ? 'btn active' : 'btn'}
-            onClick={() => navigate(n.key)}
-            style={{ flex: 'none' }}
-          >
-            {n.label}
-          </button>
-        ))}
-      </nav>
 
       <ContextMenu />
     </div>
