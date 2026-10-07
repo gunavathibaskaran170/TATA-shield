@@ -223,7 +223,7 @@ export function HardwareLive() {
           activeProviderRef.current = 'REAL_HARDWARE';
           setActiveProvider('REAL_HARDWARE');
         }
-        setTelemetry(data);
+        setTelemetry({ ...data });
       }
     });
 

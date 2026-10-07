@@ -131,6 +131,7 @@ let activeStreamType: 'hardware' | 'mock' = 'hardware';
 let mockStreamInstance: MockStream | null = null;
 let engineInstance: AnalyticsEngine | null = null;
 let started = false;
+let lastHardwarePacketTs = 0;
 
 export function getAnalyticsEngine(): AnalyticsEngine {
   if (!engineInstance) {
@@ -152,12 +153,8 @@ export function setStreamAdapter(type: 'hardware' | 'mock') {
   if (!engineInstance) return;
 
   if (type === 'hardware') {
-    if (mockStreamInstance) {
-      mockStreamInstance.disconnect();
-    }
     hardwareStream.connect();
   } else {
-    hardwareStream.disconnect();
     if (!mockStreamInstance) {
       mockStreamInstance = new MockStream();
       mockStreamInstance.onPacket((pkt) => engineInstance!.ingest(pkt));
@@ -173,6 +170,7 @@ export function startShieldStream() {
 
   // Initialize both streams with ingestion callbacks
   hardwareStream.onPacket((pkt) => {
+    lastHardwarePacketTs = Date.now();
     if (activeStreamType === 'hardware') {
       engine.ingest(pkt);
     }
@@ -180,7 +178,8 @@ export function startShieldStream() {
 
   mockStreamInstance = new MockStream();
   mockStreamInstance.onPacket((pkt) => {
-    if (activeStreamType === 'mock') {
+    // If user explicitly chose mock OR if hardware has not sent a packet in the last 2.5s
+    if (activeStreamType === 'mock' || Date.now() - lastHardwarePacketTs > 2500) {
       engine.ingest(pkt);
     }
   });

@@ -856,55 +856,69 @@ export class RealESP32SensorDataProvider implements SensorDataProvider {
 
     // 2. Parse formatted hardware line
     try {
-      // Extract Load (supports "[LOAD] 0.00 kg" and "[LOAD] W: 0.00 kg | F: ... N")
-      const loadMatch = line.match(/\[LOAD\]\s*(?:W:\s*)?([-\d.]+)\s*kg(?:\s*\|\s*F:\s*([-\d.]+)\s*N)?/i);
+      // Extract Load (supports "[LOAD] W: 0.00 kg", "[LOAD] 0.00 kg", "LOAD: 0.00kg", "LOAD: 0.00 kg", "W: 0.00 kg")
+      const loadMatch = line.match(/(?:\[LOAD\]\s*(?:W:\s*)?|LOAD:\s*|W:\s*)([-\d.]+)\s*kg(?:\s*\|\s*F:\s*([-\d.]+)\s*N)?/i);
       let loadKg = loadMatch ? parseFloat(loadMatch[1]) : this.telemetry.loadKg;
       if (this.hardwareParams.simulatedAppliedPressureKg > 0) {
         loadKg = +(loadKg + this.hardwareParams.simulatedAppliedPressureKg).toFixed(2);
       }
 
-      // Extract Stress (supports "[DYN STRESS] 0.000 MPa" and "[STRESS] Dyn: 0.000 MPa")
-      const stressMatch = line.match(/\[(?:DYN\s+)?STRESS\]\s*(?:Dyn:\s*)?([-\d.]+)\s*MPa(?:\s*\|\s*Peak:\s*([-\d.]+)\s*MPa)?/i);
-      const dynStressMpa = stressMatch ? parseFloat(stressMatch[1]) : 0;
-      const peakStressMpa = stressMatch && stressMatch[2] ? parseFloat(stressMatch[2]) : dynStressMpa;
+      // Extract Stress (supports "[DYN STRESS] 0.000 MPa", "[STRESS] Dyn: 0.000 MPa", "STRS: 0.000MPa", "STRESS: 0.000 MPa")
+      const stressMatch = line.match(/(?:\[(?:DYN\s+)?STRESS\]\s*(?:Dyn:\s*)?|STRS:\s*|STRESS:\s*)([-\d.]+)\s*MPa(?:\s*\|\s*Peak:\s*([-\d.]+)\s*MPa)?/i);
+      const dynStressMpa = stressMatch ? parseFloat(stressMatch[1]) : +(loadKg * 0.0092).toFixed(3);
+      const peakStressMpa = stressMatch && stressMatch[2] ? parseFloat(stressMatch[2]) : +(dynStressMpa * 1.25).toFixed(3);
 
-      // Extract G-Force / Shock (supports "[G] 0.98" and "[G-FORCE] 0.97 G (Shock: 9.8 m/s2)")
-      const gforceMatch = line.match(/\[(?:G-FORCE|G)\]\s*([-\d.]+)(?:\s*G)?(?:\s*\(Shock:\s*([-\d.]+)\s*m\/s2\))?/i);
+      // Extract G-Force / Shock (supports "[G] 0.98", "[G-FORCE] 0.97 G (Shock: 9.8 m/s2)", "G: 1.02", "G-FORCE: 1.02")
+      const gforceMatch = line.match(/(?:\[(?:G-FORCE|G)\]|G-FORCE:\s*|G:\s*)([-\d.]+)(?:\s*G)?(?:\s*\(Shock:\s*([-\d.]+)\s*m\/s2\))?/i);
       const gForce = gforceMatch ? parseFloat(gforceMatch[1]) : 1.0;
 
-      // Extract Warp (supports "[WARP] R: 93.1° P: 9.1°" and "[WARP] ΔR: 44.9° | ΔP: 29.1°")
-      const warpMatch = line.match(/\[WARP\]\s*(?:ΔR|R):\s*([-\d.]+)\s*°?(?:(?:\s*\|\s*|\s+)(?:ΔP|P):\s*([-\d.]+)\s*°?)?/i);
-      const roll = warpMatch ? parseFloat(warpMatch[1]) : this.telemetry.roll;
-      const pitch = warpMatch && warpMatch[2] ? parseFloat(warpMatch[2]) : this.telemetry.pitch;
+      // Extract Roll (supports "[WARP] ΔR: 0.7°", "[WARP] R: 0.7°", "ROLL: 0.7°", "ROLL: 0.7", "R: 0.7°", "ΔR: 0.7°")
+      const rollMatch = line.match(/(?:\[WARP\]\s*)?(?:ΔR|ROLL|R):\s*([-\d.]+)\s*°?/i);
+      const roll = rollMatch ? parseFloat(rollMatch[1]) : this.telemetry.roll;
 
-      // Extract Gyro
-      const gyroMatch = line.match(/\[GYRO\]\s*([-\d.]+)\s*°\/s/i);
+      // Extract Pitch (supports "ΔP: 0.6°", "PITCH: 0.6°", "P: 0.6°", "PITCH: 0.6")
+      const pitchMatch = line.match(/(?:\[WARP\]\s*)?(?:ΔP|PITCH|P):\s*([-\d.]+)\s*°?/i);
+      const pitch = pitchMatch ? parseFloat(pitchMatch[1]) : this.telemetry.pitch;
+
+      // Extract Gyro (supports "[GYRO] 0.8 °/s", "GYRO: 0.8", "GYRO: 0.8 °/s")
+      const gyroMatch = line.match(/(?:\[GYRO\]|GYRO:)\s*([-\d.]+)\s*(?:°\/s)?/i);
       const gyroVal = gyroMatch ? parseFloat(gyroMatch[1]) : 0;
 
-      // Extract Temperature (supports "[TEMP] 24.2 C" and "[TEMP] Chassis: 24.6 C (IMU: 44.9 C)")
-      const tempMatch = line.match(/\[TEMP\]\s*(?:Chassis:\s*)?([-\d.]+)\s*C(?:\s*\(IMU:\s*([-\d.]+)\s*C\))?/i);
-      let chassisTemp = tempMatch ? parseFloat(tempMatch[1]) : this.telemetry.temperatureC;
+      // Extract Temperature (supports "[TEMP] 24.2 C", "[TEMP] Chassis: 24.6 C", "TEMP: 1.8C", "TEMP: 24.5 C", "T: 24.5°C")
+      let chassisTemp = this.telemetry.temperatureC;
+      const tempMatch = line.match(/(?:\[TEMP\]\s*(?:Chassis:\s*)?|TEMP:\s*|T:\s*)([-\d.]+)\s*°?C(?:\s*\(IMU:\s*([-\d.]+)\s*C\))?/i);
+      if (tempMatch) {
+        chassisTemp = parseFloat(tempMatch[1]);
+      }
       if (this.hardwareParams.tempOverrideC !== null) {
         chassisTemp = this.hardwareParams.tempOverrideC;
       }
 
-      // Extract Alert / Status flag (e.g. "--> FRAME TORSION TWIST!!", "--> PERMANENT YIELD FAILURE!", "--> NORMAL")
-      const alertMatch = line.match(/-->\s*(.+)$/i);
-      const alertText = alertMatch ? alertMatch[1].trim() : '';
+      // Extract Alert / Status flag
+      let alertText = '';
+      if (line.includes('-->')) {
+        const parts = line.split('-->');
+        alertText = parts[parts.length - 1].trim();
+      } else {
+        const flagMatch = line.match(/\[(SAFE|NORMAL|WARN|WARNING|CRITICAL|TORSION|OVERLOAD|OVERHEAT|HAZARD)\]/i);
+        if (flagMatch) alertText = flagMatch[1].toUpperCase();
+      }
 
-      // Extract Vibration Sensor State (supports "[VIB: IDLE ]", "[VIB: ACTIVE ]", "[VIB: SHOCK ]")
-      const vibMatch = line.match(/\[VIB:\s*([^\]]+)\]/i);
-      const vibText = vibMatch ? vibMatch[1].trim().toUpperCase() : '';
-      const vibShockDetected = vibText.includes('SHOCK') || vibText.includes('ACTIVE') || vibText.includes('1') || vibText.includes('HIGH');
+      // Extract Vibration Sensor State (supports "[VIB: IDLE ]", "[VIB: ACTIVE ]", "VIB: IDLE", "VIB: SHOCK", "VIB: HIT")
+      const vibMatch = line.match(/(?:\[VIB:\s*([^\]]+)\]|VIB:\s*([a-zA-Z0-9]+))/i);
+      const vibText = vibMatch ? (vibMatch[1] || vibMatch[2] || '').trim().toUpperCase() : '';
+      const vibShockDetected = vibText.includes('SHOCK') || vibText.includes('ACTIVE') || vibText.includes('HIT') || vibText.includes('1') || vibText.includes('HIGH');
 
-      // Compute Microstrain from Stress / Load
+      // Compute Microstrain from Stress / Load / Warp
       let strainMicroStrain = 0;
       if (dynStressMpa > 0) {
         strainMicroStrain = Math.round(dynStressMpa * 500);
       } else if (loadKg > 0) {
         strainMicroStrain = Math.round(loadKg * 8);
-      } else if (Math.abs(roll) > 10 || Math.abs(pitch) > 10) {
-        strainMicroStrain = Math.round(Math.max(Math.abs(roll), Math.abs(pitch)) * 18);
+      } else if (Math.abs(roll) > 0 || Math.abs(pitch) > 0) {
+        strainMicroStrain = Math.round((Math.abs(roll) + Math.abs(pitch)) * 14 + 12);
+      } else {
+        strainMicroStrain = 14;
       }
 
       // Compute structural deflection (mm)
@@ -985,7 +999,7 @@ export class RealESP32SensorDataProvider implements SensorDataProvider {
       };
 
       for (const listener of this.listeners) {
-        listener(this.telemetry);
+        listener({ ...this.telemetry });
       }
       return true;
     } catch (e) {

@@ -339,6 +339,9 @@ export class HardwareStream implements DataSourceAdapter {
       }
     }
 
+    // Clean any packet sequence numbers like "[80] "
+    const clean = raw.replace(/^\[\d+\]\s*/, '');
+
     // Parse standard formatted serial line:
     // DATA: [LOAD] W: 0.00 kg | F: 0.00 N | [STRESS] Dyn: 0.000 MPa | Peak: 0.000 MPa | [G-FORCE] 0.98 G (Shock: 9.6 m/s2) | [WARP] ΔR: 14.2° | ΔP: 1.6° | [GYRO] 0.8 °/s | [TEMP] Chassis: 24.2 C (IMU: 44.2 C) --> STATUS
     let weightKg = this.currentMetrics.weightKg;
@@ -356,10 +359,10 @@ export class HardwareStream implements DataSourceAdapter {
     let statusFlag = this.currentMetrics.statusFlag;
 
     // Extract Load & Force (supports "[LOAD] 0.00 kg", "[LOAD] W: 0.00 kg", and "LOAD: 0.00kg")
-    const weightMatch = raw.match(/(?:\[LOAD\]\s*(?:W:\s*)?|LOAD:\s*)([-\d.]+)\s*kg/i);
+    const weightMatch = clean.match(/(?:\[LOAD\]\s*(?:W:\s*)?|LOAD:\s*|W:\s*)([-\d.]+)\s*kg/i);
     if (weightMatch) weightKg = parseFloat(weightMatch[1]);
 
-    const forceMatch = raw.match(/F:\s*([-\d.]+)\s*N/i) || raw.match(/force_N["']?:\s*([-\d.]+)/i);
+    const forceMatch = clean.match(/F:\s*([-\d.]+)\s*N/i) || clean.match(/force_N["']?:\s*([-\d.]+)/i);
     if (forceMatch) {
       forceN = parseFloat(forceMatch[1]);
     } else if (weightMatch) {
@@ -367,57 +370,61 @@ export class HardwareStream implements DataSourceAdapter {
     }
 
     // Extract Stress (supports "[DYN STRESS] 0.000 MPa", "[STRESS] Dyn: 0.000 MPa", and "STRS: 0.000MPa")
-    const dynStressMatch = raw.match(/(?:\[(?:DYN\s+)?STRESS\]\s*(?:Dyn:\s*)?|STRS:\s*)([-\d.]+)\s*MPa/i);
+    const dynStressMatch = clean.match(/(?:\[(?:DYN\s+)?STRESS\]\s*(?:Dyn:\s*)?|STRS:\s*|STRESS:\s*)([-\d.]+)\s*MPa/i);
     if (dynStressMatch) dynStressMpa = parseFloat(dynStressMatch[1]);
 
-    const peakStressMatch = raw.match(/Peak:\s*([-\d.]+)\s*MPa/i);
-    if (peakStressMatch) peakStressMpa = parseFloat(peakStressMatch[1]);
+    const peakStressMatch = clean.match(/Peak:\s*([-\d.]+)\s*MPa/i);
+    if (peakStressMatch) {
+      peakStressMpa = parseFloat(peakStressMatch[1]);
+    } else if (dynStressMatch) {
+      peakStressMpa = +(dynStressMpa * 1.25).toFixed(3);
+    }
 
     // Extract G-Force & Shock (supports "[G] 0.98", "[G-FORCE] 0.97 G", and "G: 0.99")
-    const gForceMatch = raw.match(/(?:\[(?:G-FORCE|G)\]|G:)\s*([-\d.]+)/i);
+    const gForceMatch = clean.match(/(?:\[(?:G-FORCE|G)\]|G-FORCE:\s*|G:\s*)([-\d.]+)/i);
     if (gForceMatch) gForce = parseFloat(gForceMatch[1]);
 
-    const shockMatch = raw.match(/Shock:\s*([-\d.]+)\s*m\/s2/i);
+    const shockMatch = clean.match(/Shock:\s*([-\d.]+)\s*m\/s2/i);
     if (shockMatch) shockAcc = parseFloat(shockMatch[1]);
 
     // Extract Warp (Roll & Pitch)
-    const rollMatch = raw.match(/(?:(?:\[WARP\]\s*)?(?:ΔR|ROLL|R):\s*)([-\d.]+)/i);
+    const rollMatch = clean.match(/(?:(?:\[WARP\]\s*)?(?:ΔR|ROLL|R):\s*)([-\d.]+)/i);
     if (rollMatch) rollDeg = parseFloat(rollMatch[1]);
 
-    const pitchMatch = raw.match(/(?:(?:ΔP|PITCH|P):\s*)([-\d.]+)/i);
+    const pitchMatch = clean.match(/(?:(?:\[WARP\]\s*)?(?:ΔP|PITCH|P):\s*)([-\d.]+)/i);
     if (pitchMatch) pitchDeg = parseFloat(pitchMatch[1]);
 
     // Extract Gyro
-    const gyroMatch = raw.match(/\[GYRO\]\s*([-\d.]+)\s*°\/s/i) || raw.match(/GYRO:\s*([-\d.]+)/i);
+    const gyroMatch = clean.match(/(?:\[GYRO\]|GYRO:)\s*([-\d.]+)\s*(?:°\/s)?/i);
     if (gyroMatch) gyroDps = parseFloat(gyroMatch[1]);
 
-    // Extract Temperature (supports "[TEMP] 24.2 C", "[TEMP] Chassis: 24.6 C", "TEMP: 24.5C", "T: 24.5°C")
-    if (raw.includes('Chassis: DISCONNECTED')) {
+    // Extract Temperature (supports "[TEMP] 24.2 C", "[TEMP] Chassis: 24.6 C", "TEMP: 1.8C", "T: 24.5°C")
+    if (clean.includes('Chassis: DISCONNECTED')) {
       chassisTempC = 0.0;
     } else {
-      const chassisTempMatch = raw.match(/(?:\[TEMP\]\s*(?:Chassis:\s*)?|TEMP:\s*|T:\s*)([-\d.]+)\s*(?:°?C)?/i);
+      const chassisTempMatch = clean.match(/(?:\[TEMP\]\s*(?:Chassis:\s*)?|TEMP:\s*|T:\s*)([-\d.]+)\s*°?(?:C)?/i);
       if (chassisTempMatch) chassisTempC = parseFloat(chassisTempMatch[1]);
     }
 
-    const imuTempMatch = raw.match(/IMU:\s*([-\d.]+)\s*C/i);
+    const imuTempMatch = clean.match(/IMU:\s*([-\d.]+)\s*C/i);
     if (imuTempMatch) imuTempC = parseFloat(imuTempMatch[1]);
 
     // Extract Vibration Status
-    if (raw.includes('[VIB: SHOCK') || raw.includes('VIB: HIT') || raw.includes('VIBRATION!') || raw.includes('VIB: ACTIVE')) {
+    if (clean.includes('[VIB: SHOCK') || clean.includes('VIB: HIT') || clean.includes('VIBRATION!') || clean.includes('VIB: ACTIVE')) {
       vibrationActive = true;
-    } else if (raw.includes('[VIB: IDLE ]') || raw.includes('VIB: IDLE')) {
+    } else if (clean.includes('[VIB: IDLE') || clean.includes('VIB: IDLE')) {
       vibrationActive = false;
     }
 
     // Extract Status Flag
-    if (raw.includes('-->')) {
-      const parts = raw.split('-->');
+    if (clean.includes('-->')) {
+      const parts = clean.split('-->');
       statusFlag = parts[parts.length - 1].trim();
-    } else if (raw.includes('[CRITICAL]') || raw.includes('CRITICAL') || raw.includes('TORSION') || raw.includes('TWIST')) {
+    } else if (clean.includes('[CRITICAL]') || clean.includes('CRITICAL') || clean.includes('TORSION') || clean.includes('TWIST')) {
       statusFlag = 'CRITICAL TORSION ALERT';
-    } else if (raw.includes('[CAUTION]') || raw.includes('CAUTION') || raw.includes('WARN')) {
+    } else if (clean.includes('[CAUTION]') || clean.includes('CAUTION') || clean.includes('WARN')) {
       statusFlag = 'CAUTION';
-    } else if (raw.includes('[SAFE]')) {
+    } else if (clean.includes('[SAFE]') || clean.includes('SAFE') || clean.includes('[NORMAL]')) {
       statusFlag = 'NORMAL';
     } else {
       statusFlag = 'NORMAL';
