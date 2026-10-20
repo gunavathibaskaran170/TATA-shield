@@ -182,12 +182,18 @@ export function Sel(props: { cid: string; children: ReactNode; passive?: boolean
       position={offset}
       onClick={(e) => {
         e.stopPropagation();
-        if (e.shiftKey) toggle(cid);
-        else select(cid, e.shiftKey);
+        if (e.shiftKey) {
+          toggle(cid);
+        } else {
+          select(cid);
+          setTimeout(() => {
+            useStore.getState().openComponentInspector(cid);
+          }, 240);
+        }
       }}
       onDoubleClick={(e) => {
         e.stopPropagation();
-        solo(cid);
+        useStore.getState().openComponentInspector(cid);
       }}
       onPointerOver={(e) => {
         if (passive) return;

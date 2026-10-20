@@ -199,6 +199,26 @@ export function Inspector() {
         </div>
 
         <hr className="rule" />
+        <button
+          className="btn primary"
+          style={{
+            background: 'linear-gradient(135deg, #0e3a47 0%, #082b36 100%)',
+            border: '1px solid #00e5ff',
+            color: '#00e5ff',
+            fontWeight: 700,
+            padding: '8px 12px',
+            marginBottom: 6,
+            borderRadius: 6,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            cursor: 'pointer'
+          }}
+          onClick={() => useStore.getState().openComponentInspector(def.id)}
+        >
+          <span>🔍</span> Full-Screen 3D Inspector
+        </button>
         <div className="row wrap">
           <button className="btn" onClick={() => focusOn(def.id)}>Focus camera</button>
           <button className="btn" onClick={() => solo(def.id)}>Isolate</button>
@@ -233,4 +253,4 @@ export function Inspector() {
     </div>
   );
 }
-
+

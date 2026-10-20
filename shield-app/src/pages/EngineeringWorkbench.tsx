@@ -328,12 +328,8 @@ export function EngineeringWorkbench() {
               }}
               className="text-xs px-2 py-1 bg-slate-950 border border-slate-800 rounded text-slate-200 font-bold cursor-pointer"
             >
-              <option value="complete">Complete Car</option>
-              <option value="transparent">Transparent Body</option>
-              <option value="chassis">Chassis Only</option>
-              <option value="skeletal">BIW Frame</option>
-              <option value="xray">X-Ray</option>
-              <option value="wireframe">FEA Wireframe</option>
+              <option value="complete">Complete Vehicle</option>
+              <option value="chassis">Chassis</option>
             </select>
           </div>
 

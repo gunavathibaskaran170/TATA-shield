@@ -69,6 +69,14 @@ function ComponentRow({ def, depth, expanded, toggle }: RowProps) {
         <button className="icon-btn" style={{ width: 20, height: 20, fontSize: 11, cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setGhosted(def.id, !ghosted); }} title="Ghost">
           {ghosted ? '◐' : '◑'}
         </button>
+        <button
+          className="icon-btn"
+          style={{ width: 20, height: 20, fontSize: 11, cursor: 'pointer', color: '#00e5ff' }}
+          onClick={(e) => { e.stopPropagation(); useStore.getState().openComponentInspector(def.id); }}
+          title="Open Full-Screen Component Inspector"
+        >
+          🔍
+        </button>
       </div>
       {isOpen && kids.map((k) => (
         <ComponentRow key={k.id} def={k} depth={depth + 1} expanded={expanded} toggle={toggle} />

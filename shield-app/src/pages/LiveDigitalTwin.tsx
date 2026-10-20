@@ -134,9 +134,8 @@ export function LiveDigitalTwin() {
               fontFamily: 'var(--font-sans)',
             }}
           >
-            <option value="chassis">Complete Vehicle / Chassis</option>
-            <option value="transparent">Transparent Overlay</option>
-            <option value="skeletal">Skeletal Structure</option>
+            <option value="complete">Complete Vehicle</option>
+            <option value="chassis">Chassis</option>
           </select>
         </div>
 

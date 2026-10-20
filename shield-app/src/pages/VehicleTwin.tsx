@@ -120,11 +120,8 @@ function TwinToolbar() {
       {/* mode switcher */}
       <div className="row" style={{ gap: 4, background: 'var(--bg2)', padding: '2px 4px', borderRadius: 6, border: '1px solid var(--line2)', flexWrap: 'wrap' }}>
         {[
-          { key: 'complete' as const, label: '🚘 Complete Car' },
-          { key: 'transparent' as const, label: '💎 Transparent Body' },
-          { key: 'chassis' as const, label: '🏎️ Chassis Only' },
-          { key: 'exploded' as const, label: '💥 Exploded Assembly' },
-          { key: 'skeletal' as const, label: '🦴 Skeletal View' },
+          { key: 'complete' as const, label: '🚘 Complete Vehicle' },
+          { key: 'chassis' as const, label: '🏎️ Chassis' },
         ].map((m) => (
           <button
             key={m.key}

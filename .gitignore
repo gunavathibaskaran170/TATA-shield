@@ -10,3 +10,10 @@ coverage/
 !.env.example
 .vite/
 **/node_modules/.vite/
+
+__pycache__/
+*.py[cod]
+*.class
+backend/venv/
+venv/
+.venv/

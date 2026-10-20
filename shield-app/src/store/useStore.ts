@@ -129,6 +129,34 @@ interface Store {
   setBatteryMode: (m: BatteryViewMode) => void;
   applyBatteryMode: (m: BatteryViewMode) => void;
 
+  /* ---------------- component inspection ---------------- */
+  inspectingComponent: string | null;
+  inspectingSubcomponent: string | null;
+  inspectionMode: 'visual' | 'exploded' | 'stress' | 'deformation' | 'vibration' | 'sensors';
+  inspectionExplode: number;
+  inspectionSectionAxis: 'none' | 'x' | 'y' | 'z';
+  inspectionSectionOffset: number;
+  inspectionXray: boolean;
+  inspectionOpacity: number;
+  inspectionIsolated: string | null;
+  inspectionMeasureMode: boolean;
+  inspectionMeasurePoints: [number, number, number][];
+  inspectionHotspots: boolean;
+  openComponentInspector: (id: string) => void;
+  closeComponentInspector: () => void;
+  setInspectingSubcomponent: (id: string | null) => void;
+  setInspectionMode: (m: 'visual' | 'exploded' | 'stress' | 'deformation' | 'vibration' | 'sensors') => void;
+  setInspectionExplode: (v: number) => void;
+  setInspectionSectionAxis: (a: 'none' | 'x' | 'y' | 'z') => void;
+  setInspectionSectionOffset: (v: number) => void;
+  setInspectionXray: (v: boolean) => void;
+  setInspectionOpacity: (v: number) => void;
+  setInspectionIsolated: (id: string | null) => void;
+  setInspectionMeasureMode: (v: boolean) => void;
+  addInspectionMeasurePoint: (pt: [number, number, number]) => void;
+  clearInspectionMeasurePoints: () => void;
+  setInspectionHotspots: (v: boolean) => void;
+
   /* ---------------- camera & mode ---------------- */
   viewMode: 'complete' | 'transparent' | 'chassis' | 'exploded' | 'skeletal';
   autoRotate: boolean;
@@ -493,6 +521,69 @@ export const useStore = create<Store>((set, get) => ({
     }
     set({ batteryMode: m, hidden: { ...get().hidden, ...hide }, opacity: { ...get().opacity, ...op } });
   },
+
+  /* ---------------- component inspection ---------------- */
+  inspectingComponent: null,
+  inspectingSubcomponent: null,
+  inspectionMode: 'visual',
+  inspectionExplode: 0,
+  inspectionSectionAxis: 'none',
+  inspectionSectionOffset: 0,
+  inspectionXray: false,
+  inspectionOpacity: 1,
+  inspectionIsolated: null,
+  inspectionMeasureMode: false,
+  inspectionMeasurePoints: [],
+  inspectionHotspots: true,
+  openComponentInspector: (id) => {
+    let target = id;
+    if (id === 'TractionMotor' || id === 'DriveInverter' || id === 'GearReduction' || id === 'Differential' || id === 'DriveUnit_Front') {
+      target = 'DriveUnit_Front';
+    } else if (id.startsWith('BatteryPack') || id.startsWith('Module_') || id === 'BatteryEnclosure' || id === 'BMS') {
+      target = 'BatteryEnclosure';
+    } else if (id.startsWith('Wheel_') || id.startsWith('Tire_') || id.startsWith('Disc_') || id.startsWith('Caliper_') || id === 'ProductionWheel') {
+      target = 'Wheel_FL';
+    } else if (id.startsWith('Strut_') || id.startsWith('Knuckle_') || id.startsWith('LowerControlArm_') || id.startsWith('CoilSpring_') || id === 'Suspension_Front') {
+      target = 'Suspension_Front';
+    } else if (id === 'CrashBeam' || id === 'CrushCan_L' || id === 'CrushCan_R' || id === 'FrontSubframe') {
+      target = 'FrontSubframe';
+    }
+    set({
+      inspectingComponent: target,
+      inspectingSubcomponent: null,
+      inspectionMode: 'visual',
+      inspectionExplode: 0,
+      inspectionSectionAxis: 'none',
+      inspectionSectionOffset: 0,
+      inspectionXray: false,
+      inspectionOpacity: 1,
+      inspectionIsolated: null,
+      inspectionMeasureMode: false,
+      inspectionMeasurePoints: [],
+    });
+  },
+  closeComponentInspector: () => {
+    set({
+      inspectingComponent: null,
+      inspectingSubcomponent: null,
+      inspectionMeasureMode: false,
+      inspectionMeasurePoints: [],
+    });
+  },
+  setInspectingSubcomponent: (id) => set({ inspectingSubcomponent: id }),
+  setInspectionMode: (m) => set({ inspectionMode: m }),
+  setInspectionExplode: (v) => set({ inspectionExplode: Math.max(0, Math.min(1, v)) }),
+  setInspectionSectionAxis: (a) => set({ inspectionSectionAxis: a }),
+  setInspectionSectionOffset: (v) => set({ inspectionSectionOffset: v }),
+  setInspectionXray: (v) => set({ inspectionXray: v }),
+  setInspectionOpacity: (v) => set({ inspectionOpacity: v }),
+  setInspectionIsolated: (id) => set({ inspectionIsolated: id }),
+  setInspectionMeasureMode: (v) => set({ inspectionMeasureMode: v, inspectionMeasurePoints: [] }),
+  addInspectionMeasurePoint: (pt) => set((s) => ({
+    inspectionMeasurePoints: s.inspectionMeasurePoints.length >= 2 ? [pt] : [...s.inspectionMeasurePoints, pt],
+  })),
+  clearInspectionMeasurePoints: () => set({ inspectionMeasurePoints: [] }),
+  setInspectionHotspots: (v) => set({ inspectionHotspots: v }),
 
   /* ---------------- camera & mode ---------------- */
   viewMode: 'complete',

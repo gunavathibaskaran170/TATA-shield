@@ -187,7 +187,7 @@ export function DigitalEngineering() {
       case 'modal_excitation':
       case 'torsion':
         setViewPreset('iso');
-        setViewMode('skeletal');
+        setViewMode('chassis');
         setCadView(true);
         break;
       default:
@@ -222,7 +222,7 @@ export function DigitalEngineering() {
         setCaeState('RESULT');
         setCaeStep(8);
         setSolveProgressText('SOLVE COMPLETED');
-        setViewMode('transparent');
+        setViewMode('chassis');
       }
     }, 400);
   };
@@ -334,10 +334,8 @@ export function DigitalEngineering() {
                 fontFamily: 'var(--font-sans)',
               }}
             >
-              <option value="chassis">Complete Vehicle / Chassis</option>
-              <option value="skeletal">Skeletal Frame Only</option>
-              <option value="body">Full Exterior Body</option>
-              <option value="transparent">Transparent Stress Overlay</option>
+              <option value="complete">Complete Vehicle</option>
+              <option value="chassis">Chassis</option>
             </select>
           </div>
 
@@ -851,7 +849,7 @@ export function DigitalEngineering() {
                 {/* STEP 8: RESULTS */}
                 <div style={{ background: '#101923', borderRadius: 8, border: caeStep === 8 ? '1px solid #16A8E0' : '1px solid #1F2B38', overflow: 'hidden' }}>
                   <button
-                    onClick={() => { setCaeStep(8); setCaeState('RESULT'); setViewMode('transparent'); }}
+                    onClick={() => { setCaeStep(8); setCaeState('RESULT'); setViewMode('chassis'); }}
                     style={{ width: '100%', height: 42, padding: '0 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: caeStep === 8 ? 'rgba(22, 168, 224, 0.15)' : 'transparent', border: 'none', cursor: 'pointer', color: '#F2F5F8', fontFamily: 'var(--font-sans)' }}
                   >
                     <span style={{ fontSize: 13, fontWeight: 600 }}>{caeStep === 8 ? '●' : '○'} 8. Results</span>

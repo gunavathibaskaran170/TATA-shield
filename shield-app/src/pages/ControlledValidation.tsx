@@ -108,9 +108,8 @@ export function ControlledValidation() {
               fontFamily: 'var(--font-sans)',
             }}
           >
-            <option value="chassis">Complete Vehicle / Chassis</option>
-            <option value="skeletal">Skeletal Frame Only</option>
-            <option value="transparent">Transparent Stress Overlay</option>
+            <option value="complete">Complete Vehicle</option>
+            <option value="chassis">Chassis</option>
           </select>
         </div>
 
