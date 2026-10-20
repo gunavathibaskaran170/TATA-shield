@@ -21,6 +21,8 @@ export interface HardpointLimitProfile {
   ultimateForceLimitKn: number;
   nominalPos: [number, number, number];
   defaultLoadDir: [number, number, number];
+  contactAreaMm2?: number;
+  contactPressureAllowableMpa?: number;
   description: string;
 }
 
@@ -80,6 +82,8 @@ export const HARDPOINT_PROFILES: Record<string, HardpointLimitProfile> = {
     ultimateForceLimitKn: 48.0,
     nominalPos: [-0.85, 0.15, 0.0],
     defaultLoadDir: [0, -1, 0],
+    contactAreaMm2: 38000,
+    contactPressureAllowableMpa: 1.5,
     description: 'Extruded aluminum side sill protecting high-voltage pack cells from lateral intrusion and bending.',
   },
   shock_tower_fl: {
@@ -118,6 +122,8 @@ export const HARDPOINT_PROFILES: Record<string, HardpointLimitProfile> = {
     ultimateForceLimitKn: 95.0,
     nominalPos: [0.0, 0.25, 0.85],
     defaultLoadDir: [0, -1, 0],
+    contactAreaMm2: 14000,
+    contactPressureAllowableMpa: 4.5,
     description: 'Ultra-high strength hot-stamped crossmember preventing footwell intrusion under crash load.',
   },
   rear_subframe: {
@@ -161,6 +167,8 @@ export interface EngineeringCalculationResult {
   percentRecovery: number;
   isYieldExceeded: boolean;
   isUltimateExceeded: boolean;
+  contactPressureMpa: number | null;
+  contactUtilizationPct: number | null;
 }
 
 export function calculateStructuralResponse(
@@ -228,6 +236,14 @@ export function calculateStructuralResponse(
   const governing = metrics[0];
   const utilizationIndexPct = Math.round(governing.val * 10) / 10;
 
+  // Contact pressure calculation (where surface contact geometry is defined)
+  const contactPressureMpa = profile.contactAreaMm2 && activeForceKn > 0
+    ? Math.round(((activeForceKn * 1000) / profile.contactAreaMm2) * 100) / 100
+    : null;
+  const contactUtilizationPct = contactPressureMpa && profile.contactPressureAllowableMpa
+    ? Math.round((contactPressureMpa / profile.contactPressureAllowableMpa) * 1000) / 10
+    : null;
+
   // Yield and ultimate conditions based on peak force parameter
   const isYieldExceeded = forceKn >= effectiveYieldForce;
   const isUltimateExceeded = forceKn >= profile.ultimateForceLimitKn;
@@ -285,5 +301,7 @@ export function calculateStructuralResponse(
     percentRecovery,
     isYieldExceeded,
     isUltimateExceeded,
+    contactPressureMpa,
+    contactUtilizationPct,
   };
 }

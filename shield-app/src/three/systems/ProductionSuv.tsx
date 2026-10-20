@@ -561,7 +561,7 @@ export function ProductionSuv() {
   const isChassisOnly = viewMode === 'chassis';
   const isExplodedMode = viewMode === 'exploded' || explode > 0.05;
   const isWireframeActive = isChassisOnly || wireframe;
-  const opacityVal = wireframeOpacity;
+  const opacityVal = isChassisOnly ? Math.max(0.65, wireframeOpacity) : wireframeOpacity;
 
   const currentPaint = isTransparent ? BODY_PAINT_TRANSPARENT : BODY_PAINT;
   const currentGlass = isTransparent ? { ...GLASS_SMOKED, opacity: 0.18 } : GLASS_SMOKED;

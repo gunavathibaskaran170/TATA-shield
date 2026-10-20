@@ -545,12 +545,12 @@ export function VehicleScene() {
 
         <group name="shield-vehicle" scale={[1.35, 1.35, 1.35]}>
           {isSkeletal ? <VehicleAssembly cad={cadView} /> : <ProductionSuv />}
+          <WorkbenchGizmos />
         </group>
 
         {isSkeletal && (cadView && explode > 0.05 ? <ExplodedOverlays /> : <LoadPathArrows />)}
         {isSkeletal && <ClipGizmos />}
-        {page !== 'digital_eng' && <WorkbenchGizmos />}
-        {page === 'digital_eng' && (
+        {page === 'digital_eng' && viewMode !== 'chassis' && (
           <CaeVisualizationGizmos
             caeState={caeState}
             animationProgress={caeAnimationProgress}

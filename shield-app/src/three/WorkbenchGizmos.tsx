@@ -14,6 +14,7 @@ import { useStore } from '../store/useStore';
 import { HARDPOINT_PROFILES, calculateStructuralResponse } from '../data/hardpoints';
 
 export const WorkbenchGizmos: React.FC = () => {
+  const viewMode = useStore((s) => s.viewMode);
   const activeHardpointId = useStore((s) => s.activeHardpointId);
   const forceN = useStore((s) => s.manualAppliedForceN);
   const loadVector = useStore((s) => s.manualLoadVector);
@@ -26,7 +27,7 @@ export const WorkbenchGizmos: React.FC = () => {
   const caeState = useStore((s) => s.caeState);
 
   const profile = HARDPOINT_PROFILES[activeHardpointId] || HARDPOINT_PROFILES.front_rail_lh;
-  const forceKn = forceN / 1000;
+  const forceKn = forceN > 0 ? forceN / 1000 : (viewMode === 'chassis' ? 15.0 : 0);
   const physics = useMemo(() => calculateStructuralResponse(profile, forceKn, tempC, 'DURING'), [profile, forceKn, tempC]);
 
   // Nominal position of load point
@@ -169,16 +170,21 @@ export const WorkbenchGizmos: React.FC = () => {
       )}
 
       {/* Reaction Ground Support Boundary Fixed Icons (▲) */}
-      {[-0.68, 0.68].map((rx, i) => (
-        <group key={i} position={[rx, 0.12, -1.35]}>
+      {[
+        [0.88, 0.38, 0.4],
+        [0.88, 0.38, -0.8],
+      ].map(([sx, sy, sz], i) => (
+        <group key={i} position={[sx, sy, sz]}>
           <mesh rotation={[0, 0, 0]}>
-            <coneGeometry args={[0.08, 0.16, 4]} />
-            <meshStandardMaterial color="#10b981" metalness={0.8} roughness={0.2} />
+            <coneGeometry args={[0.07, 0.14, 4]} />
+            <meshStandardMaterial color="#10b981" metalness={0.8} roughness={0.2} emissive="#059669" emissiveIntensity={0.6} />
           </mesh>
-          <Html position={[0, -0.15, 0]} center>
-            <span className="tiny font-mono font-bold text-emerald-400 bg-slate-950/80 px-1 rounded border border-emerald-800">
-              ▲ FIXED SUPP
-            </span>
+          <Html position={[0, -0.16, 0]} center>
+            <div className="flex flex-col items-center bg-slate-950/90 px-1 py-0.5 rounded border border-emerald-500/80 shadow-lg text-[9px] font-mono font-bold leading-tight text-emerald-400">
+              <span className="text-[8px]">▲</span>
+              <span>FIXED</span>
+              <span>SUPP</span>
+            </div>
           </Html>
         </group>
       ))}
